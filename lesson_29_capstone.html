@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 29: Cross-Asset Macro Capstone</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 29: Cross-Asset Macro Capstone</h1>
+<p class="subtitle">Module G, Week 8, Lesson 29. The integration of everything. Universe, signals, blending, optimisation, vol target, drawdown, costs, backtest, attribution. The flagship Macrosynergy strategy in spirit.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s1">Build specification</a></li>
+    <li><a href="#s2">Universe and data</a></li>
+    <li><a href="#s3">Signal stack</a></li>
+    <li><a href="#s4">Composite forecast</a></li>
+    <li><a href="#s5">Risk and execution overlay</a></li>
+    <li><a href="#s6">Performance and attribution</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s1">1. Build specification</h2>
+<p>The capstone strategy:</p>
+<ul>
+  <li><strong>Universe:</strong> 6 G10 currencies, 5 government bonds, 8 equity index futures, 6 commodities. 25 instruments across 4 asset classes.</li>
+  <li><strong>Signals:</strong> trend, carry, value, macro growth surprise, macro inflation surprise. 5 signals.</li>
+  <li><strong>Forecast:</strong> equal-weighted composite signal across signals (conceptual parity).</li>
+  <li><strong>Optimisation:</strong> sigmoid sizing on the composite.</li>
+  <li><strong>Risk:</strong> per-asset vol targeting at 10%, then asset-class ERC across the 4 buckets.</li>
+  <li><strong>Drawdown:</strong> MinMax overlay at 12% threshold, $\kappa = 15$.</li>
+  <li><strong>Costs:</strong> 5 bp DM, 15 bp EM and commodities.</li>
+  <li><strong>Rebalance:</strong> monthly, with 50 bp drift band.</li>
+</ul>
+
+<h2 id="s2">2. Universe and data</h2>
+<p>Synthetic data for the demo. In production the macro signals come from the JPMaQS macro-quantamental dataset (Macrosynergy product).</p>
+
+<h2 id="s3">3. Signal stack</h2>
+<p>For each instrument, compute 5 signals:</p>
+<ul>
+  <li><strong>Trend.</strong> 12-month log return minus current value (TSMOM).</li>
+  <li><strong>Carry.</strong> Yield differential (FX), futures roll yield (commodity), term-spread (rates), dividend yield (equity).</li>
+  <li><strong>Value.</strong> 5-year mean reversion z-score.</li>
+  <li><strong>Macro growth.</strong> Real GDP nowcast minus trend, point-in-time.</li>
+  <li><strong>Macro inflation.</strong> CPI YoY minus central bank target.</li>
+</ul>
+<p>Each signal is z-scored within asset class and capped at ±2.</p>
+
+<h2 id="s4">4. Composite forecast</h2>
+<p>Equal-weight the 5 signal z-scores into a single composite per instrument. No optimisation. Conceptual parity.</p>
+
+<h2 id="s5">5. Risk and execution overlay</h2>
+<ol>
+  <li>Sigmoid sizing of composite to position $\in [-2, 2]$.</li>
+  <li>Per-asset vol target at 10% (lagged EWMA, 22-day half-life).</li>
+  <li>Within asset class, equal weight (alternative: ERC).</li>
+  <li>Across asset classes, equal risk contribution.</li>
+  <li>Strategy-level vol target at 10%.</li>
+  <li>MinMax drawdown overlay.</li>
+  <li>Cost layer: 5 bp DM, 15 bp EM/commodities, applied to monthly turnover.</li>
+</ol>
+
+<h2 id="s6">6. Performance and attribution</h2>
+
+<h3>Live: capstone explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Vol target (%): <span class="value" id="vt_v">10</span></label>
+      <input type="range" id="vt" min="5" max="15" step="0.5" value="10">
+    </div>
+    <div class="control">
+      <label>Drawdown threshold (%): <span class="value" id="dd_v">12</span></label>
+      <input type="range" id="dd" min="5" max="25" step="1" value="12">
+    </div>
+    <div class="control">
+      <label>Cost (bp DM): <span class="value" id="cost_v">5</span></label>
+      <input type="range" id="cost" min="0" max="50" step="1" value="5">
+    </div>
+    <div class="control">
+      <label>Composite signal IC: <span class="value" id="ic_v">0.10</span></label>
+      <input type="range" id="ic" min="0" max="0.20" step="0.01" value="0.10">
+    </div>
+  </div>
+  <div id="cap_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Annualised return</span><span class="stat-value" id="ann_ret">0</span></div>
+    <div class="stat"><span>Annualised vol</span><span class="stat-value" id="ann_vol">0</span></div>
+    <div class="stat"><span>Sharpe</span><span class="stat-value" id="sharpe">0</span></div>
+    <div class="stat"><span>Max drawdown</span><span class="stat-value" id="mdd">0</span></div>
+    <div class="stat"><span>Sortino</span><span class="stat-value" id="sortino">0</span></div>
+    <div class="stat"><span>Calmar</span><span class="stat-value" id="calmar">0</span></div>
+    <div class="stat"><span>Annual turnover</span><span class="stat-value" id="turn">0</span></div>
+    <div class="stat"><span>Net cost drag (bp/yr)</span><span class="stat-value" id="drag">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Toggle vol target down to 5%.</strong> Sharpe is unchanged (vol targeting is scale-invariant) but absolute return drops. Now toggle drawdown threshold from 25% to 5%. The drawdown overlay activates more often, cutting both upside and downside; Sharpe holds, max DD shrinks. Crank cost to 50 bp: net Sharpe collapses if the strategy was high-turnover.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 3, the flagship):</strong> "Unlocking relative value across asset classes" delivers Sharpe 1.8, Sortino 2.7, correlation to S&amp;P 500 of 10 to 20%, top 5% of months contribute 35 to 40% of PnL. The strategy uses the same architecture as this capstone: macro scorecard signals (themes), equal weighting within and across themes, vol targeting per asset, drawdown control. The capstone demo here approximates the flagship pattern. Full implementation requires the JPMaQS dataset and the open-source `macrosynergy` package; see article 39.
+</div>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+
+<h3>Exercise A: Build the capstone in code</h3>
+<pre><code>class Capstone:
+    def __init__(self, config):
+        self.config = config
+    def universe(self): ...
+    def signals(self): ...  # trend, carry, value, growth, inflation
+    def composite(self):
+        return self.signals().mean(axis=1)
+    def positions(self):
+        return np.tanh(self.composite())
+    def vol_target(self, positions):
+        sigma = self.realised_vol().shift(1)
+        return positions * (self.config.target_vol / sigma).clip(upper=3)
+    def drawdown_overlay(self, ret):
+        eq = (1 + ret).cumprod()
+        peak = np.maximum.accumulate(eq)
+        dd = 1 - eq / peak
+        lev = np.where(dd < self.config.dd_thresh, 1, np.exp(-self.config.kappa * (dd - self.config.dd_thresh)))
+        return ret * lev
+    def costs(self, weights):
+        turnover = (weights.diff().abs().sum(axis=1)).mean() * 12
+        return turnover * self.config.cost_bp / 10000
+    def run(self):
+        sigs = self.signals()
+        comp = self.composite()
+        pos = self.positions()
+        pos_vt = self.vol_target(pos)
+        ret = (pos_vt * self.returns()).sum(axis=1)
+        ret = self.drawdown_overlay(ret)
+        return ret - self.costs(pos_vt) / 252</code></pre>
+
+<h3>Exercise B: Performance attribution by signal family</h3>
+<p>Decompose total PnL into trend, carry, value, growth, inflation contributions. Each contributes via its weight in the composite signal.</p>
+
+<h3>Exercise C: Stress test on historical regimes</h3>
+<p>Replay the strategy through 2008, 2020, 2022. Report drawdown by regime. Compare to a static 60/40 in the same windows.</p>
+
+<h3>Exercise D: Walk-forward CPCV evaluation</h3>
+<p>Apply CPCV with 6 folds and 2 test folds. Report Sharpe distribution and deflated Sharpe.</p>
+
+<h3>Exercise E: Add ESG and mandate constraints</h3>
+<p>Apply max-position caps per asset class. Report the alpha cost.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why is the Macrosynergy flagship strategy correlation to S&amp;P 500 only 10 to 20% despite using equity indices? Hint: long-short cross-sectional structure and macro signal diversity.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Build the capstone end-to-end. Run a backtest. Report Sharpe, drawdown, and per-signal-family contribution.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For the capstone with target vol 10%, max DD 12%, cost 5 bp, IC 0.10 across 25 instruments, what would you expect for net Sharpe?</p>
+  <p><em>Answer:</em> Roughly 0.8 to 1.2 (slightly below the in-sample backtest because of cost and DSR adjustments).</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_28_pipeline.html">← Lesson 28</a></span>
+  <span><a href="lesson_30_frontier.html">Next: Lesson 30, Frontier topics →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function update29() {
+  const vt = parseFloat(document.getElementById('vt').value) / 100;
+  const dd = parseFloat(document.getElementById('dd').value) / 100;
+  const cost = parseFloat(document.getElementById('cost').value) / 10000;
+  const ic = parseFloat(document.getElementById('ic').value);
+  document.getElementById('vt_v').textContent = (vt * 100).toFixed(1);
+  document.getElementById('dd_v').textContent = (dd * 100).toFixed(0);
+  document.getElementById('cost_v').textContent = (cost * 10000).toFixed(0);
+  document.getElementById('ic_v').textContent = ic.toFixed(2);
+
+  // Generate synthetic strategy returns based on IC and breadth
+  const N = 25; // instruments
+  const rebalsPerYr = 12;
+  const breadth = N * rebalsPerYr;
+  const grossSR = ic * Math.sqrt(breadth);
+  const grossAlpha = grossSR * vt; // grossSR * target_vol
+  // Add stress periods
+  const years = 25;
+  const n = years * 252;
+  const rng = mulberry32(2026);
+  const ret = new Array(n);
+  for (let t = 0; t < n; t++) {
+    let stress = 0;
+    if ((t > 0.3 * n && t < 0.35 * n) || (t > 0.6 * n && t < 0.62 * n) || (t > 0.85 * n && t < 0.87 * n)) stress = 1;
+    const baseMu = grossAlpha / 252 * (1 - 0.5 * stress);
+    const baseVol = vt / Math.sqrt(252) * (1 + stress);
+    ret[t] = baseMu + baseVol * randn(rng);
+  }
+
+  // Apply drawdown overlay
+  const eq = new Array(n + 1); eq[0] = 1;
+  const ret_dd = new Array(n);
+  let peak = 1;
+  for (let t = 0; t < n; t++) {
+    const ddCurr = 1 - eq[t] / peak;
+    const lev = ddCurr < dd ? 1 : Math.exp(-15 * (ddCurr - dd));
+    ret_dd[t] = ret[t] * lev;
+    eq[t+1] = eq[t] * (1 + ret_dd[t]);
+    peak = Math.max(peak, eq[t+1]);
+  }
+  // Apply cost (assume 200% annual turnover)
+  const annTurn = 2;
+  const dailyDrag = cost * annTurn / 252;
+  const ret_net = ret_dd.map(r => r - dailyDrag);
+  const eq_net = new Array(n + 1); eq_net[0] = 1;
+  for (let t = 0; t < n; t++) eq_net[t+1] = eq_net[t] * (1 + ret_net[t]);
+
+  // Stats
+  let m = 0; for (const r of ret_net) m += r;
+  m /= n;
+  let v = 0; for (const r of ret_net) v += (r - m) ** 2;
+  v /= n;
+  const annRet = m * 252;
+  const annVol = Math.sqrt(v) * Math.sqrt(252);
+  const sharpe = annRet / annVol;
+  let pk = eq_net[0], maxDD = 0;
+  for (const x of eq_net) { pk = Math.max(pk, x); maxDD = Math.max(maxDD, 1 - x / pk); }
+  // Sortino
+  let downSq = 0, downN = 0;
+  for (const r of ret_net) if (r < 0) { downSq += r * r; downN++; }
+  const downside = Math.sqrt(downSq / Math.max(downN, 1)) * Math.sqrt(252);
+  const sortino = annRet / Math.max(downside, 0.001);
+  const calmar = annRet / Math.max(maxDD, 0.001);
+
+  document.getElementById('ann_ret').textContent = (annRet * 100).toFixed(2) + '%';
+  document.getElementById('ann_vol').textContent = (annVol * 100).toFixed(2) + '%';
+  document.getElementById('sharpe').textContent = sharpe.toFixed(2);
+  document.getElementById('mdd').textContent = (maxDD * 100).toFixed(1) + '%';
+  document.getElementById('sortino').textContent = sortino.toFixed(2);
+  document.getElementById('calmar').textContent = calmar.toFixed(2);
+  document.getElementById('turn').textContent = (annTurn * 100).toFixed(0) + '%';
+  document.getElementById('drag').textContent = (cost * annTurn * 10000).toFixed(0);
+
+  Plotly.react('cap_plot', [
+    { y: eq_net, mode: 'lines', name: 'Capstone strategy', line: { color: '#2b6cb0', width: 2 } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Day' },
+    yaxis: { title: 'Equity (growth of $1)', type: 'log' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['vt', 'dd', 'cost', 'ic'].forEach(id => document.getElementById(id).addEventListener('input', update29));
+update29();
+</script>
+</body>
+</html>

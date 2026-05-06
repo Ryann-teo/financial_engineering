@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 27: Regime-Aware Allocation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 27: Regime-Aware Allocation</h1>
+<p class="subtitle">Module F, Week 7, Lesson 27. Allocations that ignore regime fail at the worst time. A regime layer adds the most Sharpe of any single overlay after vol targeting.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">What is a regime?</a></li>
+    <li><a href="#s2">Hidden Markov Models</a></li>
+    <li><a href="#s3">Regime classifiers from macro features</a></li>
+    <li><a href="#s4">Regime-conditional allocation</a></li>
+    <li><a href="#s5">Smooth tilting vs hard switching</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Number of regimes</h3>
+<p>2 (calm, stress) is most common. 3 (calm, normal, stress) is the next step. More than 3 rarely justifies the added complexity.</p>
+<h3>Smoothing parameter</h3>
+<p>How responsive the regime classifier is. High = fast switching. Low = sticky regimes.</p>
+<h3>Stress allocation tilt</h3>
+<p>How much to deleverage in stress regime. Common: 50 to 80% of normal exposure.</p>
+
+<h2 id="s1">1. What is a regime?</h2>
+<p>A regime is a state of the world where the joint distribution of returns differs systematically from another state. Examples:</p>
+<ul>
+  <li><strong>Risk-on / risk-off.</strong> Equity-bond correlation, vol levels.</li>
+  <li><strong>Inflation regime.</strong> CPI growth above or below central bank target.</li>
+  <li><strong>Growth regime.</strong> Real GDP growth above or below trend.</li>
+  <li><strong>Monetary regime.</strong> Easing or tightening cycles.</li>
+</ul>
+<p>The economic content matters. A regime is useful only if it predicts something different from the prior. "Crisis" is a regime; "Tuesday" is not.</p>
+
+<h2 id="s2">2. Hidden Markov Models</h2>
+<p>Hamilton (1989) brought HMMs to macro. The idea: returns depend on a hidden state $s_t$ that switches according to a Markov chain. The state is unobservable; we infer probabilities via Baum-Welch.</p>
+<div class="formula">$$P(s_t = j \mid s_{t-1} = i) = T_{ij}, \quad r_t \mid s_t = j \sim N(\mu_j, \Sigma_j)$$</div>
+<p>Output: filtered probability $P(s_t = j \mid r_{1:t})$ at each time. Use as a soft tilt on allocation rather than a hard switch.</p>
+
+<h2 id="s3">3. Regime classifiers from macro features</h2>
+<p>Alternative to HMM: build a classifier from observable macro features.</p>
+<ul>
+  <li>VIX level + 200d MA → vol regime.</li>
+  <li>Yield curve slope + ISM PMI → growth regime.</li>
+  <li>CPI surprise + breakeven inflation → inflation regime.</li>
+</ul>
+<p>Macrosynergy uses random forests (art 111, 136) to combine many macro features into a regime probability. Trained on historical regimes labelled by drawdown depth or NBER recession.</p>
+
+<h2 id="s4">4. Regime-conditional allocation</h2>
+<p>Given regime probabilities $\pi_t = (\pi_{1t}, \ldots, \pi_{Kt})$ and per-regime target weights $w^{(k)}$:</p>
+<div class="formula">$$w_t = \sum_k \pi_{kt} \cdot w^{(k)}$$</div>
+<p>The portfolio smoothly blends the per-regime targets weighted by current probabilities.</p>
+<p>Per-regime targets are calibrated to the expected return distribution in each regime. Stress regime: defensive (more bonds, gold, less equity). Calm regime: offensive (more equity, EM, less duration).</p>
+
+<h2 id="s5">5. Smooth tilting vs hard switching</h2>
+<p>Hard switching: pick the most likely regime, allocate accordingly. Cliff edges. High turnover at regime boundaries.</p>
+<p>Smooth tilting: weight by probability. Continuous transitions. Lower turnover. Production preference.</p>
+<p>Empirical: smooth tilting beats hard switching by 0.05 to 0.15 Sharpe in most studies, mostly from reduced turnover and less whipsawing.</p>
+
+<h3>Live: regime classifier</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Vol threshold (%): <span class="value" id="vth_v">22</span></label>
+      <input type="range" id="vth" min="10" max="40" step="1" value="22">
+    </div>
+    <div class="control">
+      <label>Smoothing (days): <span class="value" id="sm_v">22</span></label>
+      <input type="range" id="sm" min="1" max="60" step="1" value="22">
+    </div>
+    <div class="control">
+      <label>Stress equity weight: <span class="value" id="se_v">0.30</span></label>
+      <input type="range" id="se" min="0" max="1" step="0.05" value="0.30">
+    </div>
+  </div>
+  <div id="regime_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Static Sharpe</span><span class="stat-value" id="sr_st">0</span></div>
+    <div class="stat"><span>Regime-aware Sharpe</span><span class="stat-value" id="sr_rg">0</span></div>
+    <div class="stat"><span>Static max DD</span><span class="stat-value" id="dd_st">0</span></div>
+    <div class="stat"><span>Regime-aware max DD</span><span class="stat-value" id="dd_rg">0</span></div>
+  </div>
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 89, 111, 136, 76, 220):</strong> Article 89 uses correlation matrix eigenstructure as a regime classifier (when the largest eigenvalue dominates, all assets move together = stress). Articles 111 and 136 use random forests with macro features. Article 76 maps macroeconomic cycles to asset class returns. Article 220 uses drawdown itself as a regime indicator. The MS production stack: 2-state HMM on cross-asset correlations + macro feature random forest + drawdown control. Smooth tilting on the combined regime probability.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 The Baum-Welch algorithm</h3>
+<p>EM algorithm for HMMs. Iterate:</p>
+<ol>
+  <li>E-step: compute filtered and smoothed regime probabilities given current parameters.</li>
+  <li>M-step: re-estimate transition matrix $T$ and emission distributions $\{\mu_j, \Sigma_j\}$ from probability-weighted data.</li>
+</ol>
+<p>Converges to local optimum of the likelihood. Multiple random starts help find the global one.</p>
+<h3>6.2 The forward-backward filter</h3>
+<p>Filtered probability: $\alpha_t(j) = P(s_t = j \mid r_{1:t})$.</p>
+<p>Smoothed: $\gamma_t(j) = P(s_t = j \mid r_{1:T})$.</p>
+<p>Use filtered for real-time; use smoothed for historical analysis (don't peek).</p>
+<h3>6.3 Regime-conditional vs unconditional Sharpe</h3>
+<p>If regime $k$ has Sharpe $\text{SR}_k$ and probability $\pi_k$ unconditionally:</p>
+<div class="formula">$$\text{SR}_{\text{static}} \le \text{SR}_{\text{regime-aware}}$$</div>
+<p>The gap depends on how different the regimes are. For 2 regimes with very different conditional means, the gap is large.</p>
+<h3>6.4 Why hard switching whipsaws</h3>
+<p>When the regime probability hovers near 0.5, hard switching produces noisy decisions. Smooth tilting averages them out.</p>
+<h3>6.5 Persistent vs transient regimes</h3>
+<p>If $T_{ii} \approx 0.99$ (regime persists with prob 99% per day), expected duration is 100 days. Calibrate $T$ to historical regime length to avoid spurious switches.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: 2-state HMM with hmmlearn</h3>
+<pre><code>from hmmlearn.hmm import GaussianHMM
+features = pd.DataFrame({'spy_ret': spy_returns, 'vix': vix_level})
+model = GaussianHMM(n_components=2, covariance_type='full', n_iter=200).fit(features.values)
+state_probs = model.predict_proba(features.values)</code></pre>
+
+<h3>Exercise B: Threshold-based regime</h3>
+<p>Stress = realised vol &gt; threshold OR drawdown &gt; threshold. Smooth via EWMA.</p>
+
+<h3>Exercise C: Regime-conditional 60/40</h3>
+<p>In calm regime: 60/40. In stress: 30/70 (defensive). Smooth tilt.</p>
+
+<h3>Exercise D: Random forest regime</h3>
+<p>Features: VIX, yield curve slope, breakeven inflation, ISM PMI. Label: NBER recession dummy. Train RF. Predict probabilities.</p>
+
+<h3>Exercise E: Backtest regime overlay</h3>
+<p>Apply a regime classifier on top of a static signal. Report Sharpe and drawdown improvements.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why is smooth tilting preferable to hard switching at regime boundaries?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise A to use 3 states (calm, normal, stress). Compare conditional Sharpe to 2-state.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>If $T_{ii} = 0.95$ daily, what is expected regime duration in trading days?</p>
+  <p><em>Answer:</em> $1 / (1 - 0.95) = 20$ days.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_26_signal_blending.html">← Lesson 26</a></span>
+  <span><a href="lesson_28_pipeline.html">Next: Lesson 28, Pipeline →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function update27() {
+  const vth = parseFloat(document.getElementById('vth').value) / 100;
+  const sm = parseInt(document.getElementById('sm').value);
+  const se = parseFloat(document.getElementById('se').value);
+  document.getElementById('vth_v').textContent = (vth * 100).toFixed(0);
+  document.getElementById('sm_v').textContent = sm;
+  document.getElementById('se_v').textContent = se.toFixed(2);
+
+  // Synthetic: 5 years of daily SPY returns and AGG returns with switching regimes
+  const n = 1260;
+  const rng = mulberry32(2026);
+  const spyRet = new Array(n);
+  const aggRet = new Array(n);
+  const realisedVol = new Array(n);
+  const vol_state = new Array(n);
+  vol_state[0] = 0.15 / Math.sqrt(252);
+  for (let t = 0; t < n; t++) {
+    // Vol regime: switches based on past returns
+    const stressMode = (t > 200 && t < 400) || (t > 700 && t < 850) || (t > 1050 && t < 1150);
+    const targetVol = stressMode ? 0.40 : 0.13;
+    if (t > 0) vol_state[t] = vol_state[t-1] * 0.95 + targetVol / Math.sqrt(252) * 0.05;
+    spyRet[t] = (stressMode ? -0.20 / 252 : 0.10 / 252) + vol_state[t] * randn(rng);
+    aggRet[t] = 0.04 / 252 + 0.05 / Math.sqrt(252) * randn(rng) - 0.3 * (stressMode ? -spyRet[t] * 0.5 : 0);
+    realisedVol[t] = vol_state[t] * Math.sqrt(252);
+  }
+
+  // Smoothed realised vol
+  const alpha = 1 - Math.pow(0.5, 1 / sm);
+  const smoothedVol = new Array(n);
+  smoothedVol[0] = realisedVol[0];
+  for (let t = 1; t < n; t++) smoothedVol[t] = alpha * realisedVol[t] + (1 - alpha) * smoothedVol[t-1];
+  // Regime probability: sigmoid of (vol - threshold)
+  const regimeP = smoothedVol.map(v => 1 / (1 + Math.exp(-15 * (v - vth))));
+
+  // Static 60/40
+  const staticRet = spyRet.map((r, t) => 0.6 * r + 0.4 * aggRet[t]);
+  // Regime-aware: weights = (1 - p) * [0.6, 0.4] + p * [se, 1-se]
+  const regimeRet = spyRet.map((r, t) => {
+    const we = (1 - regimeP[t]) * 0.6 + regimeP[t] * se;
+    return we * r + (1 - we) * aggRet[t];
+  });
+
+  function stats(ret) {
+    const n_ = ret.length;
+    let m = 0; for (const r of ret) m += r / n_;
+    let v = 0; for (const r of ret) v += (r - m) ** 2 / n_;
+    const eq = new Array(n_ + 1); eq[0] = 1;
+    for (let t = 0; t < n_; t++) eq[t+1] = eq[t] * (1 + ret[t]);
+    let peak = eq[0], maxDD = 0;
+    for (const x of eq) { peak = Math.max(peak, x); maxDD = Math.max(maxDD, 1 - x / peak); }
+    return { sharpe: m / Math.sqrt(v) * Math.sqrt(252), eq, maxDD };
+  }
+
+  const sStatic = stats(staticRet);
+  const sRegime = stats(regimeRet);
+
+  document.getElementById('sr_st').textContent = sStatic.sharpe.toFixed(2);
+  document.getElementById('sr_rg').textContent = sRegime.sharpe.toFixed(2);
+  document.getElementById('dd_st').textContent = (sStatic.maxDD * 100).toFixed(1) + '%';
+  document.getElementById('dd_rg').textContent = (sRegime.maxDD * 100).toFixed(1) + '%';
+
+  Plotly.react('regime_plot', [
+    { y: sStatic.eq, mode: 'lines', name: 'Static 60/40', line: { color: '#cbd5e0', width: 2 } },
+    { y: sRegime.eq, mode: 'lines', name: 'Regime-aware', line: { color: '#2b6cb0', width: 2 } },
+    { y: regimeP.map(x => 1 + x), mode: 'lines', name: 'Stress probability', line: { color: '#c53030', width: 1, dash: 'dot' }, yaxis: 'y2' }
+  ], {
+    margin: { l: 60, r: 60, t: 30, b: 50 },
+    xaxis: { title: 'Day' },
+    yaxis: { title: 'Equity (growth of $1)' },
+    yaxis2: { title: 'Stress prob (offset)', overlaying: 'y', side: 'right', showgrid: false, range: [1, 2] },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['vth', 'sm', 'se'].forEach(id => document.getElementById(id).addEventListener('input', update27));
+update27();
+</script>
+</body>
+</html>

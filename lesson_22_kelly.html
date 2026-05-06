@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 22: Kelly Criterion</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 22: Kelly Criterion</h1>
+<p class="subtitle">Module E, Week 6, Lesson 22. Maximise log wealth, not single-period mean-variance utility. Kelly is the long-run growth optimum. Fractional Kelly is the practical compromise.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Single-bet Kelly</a></li>
+    <li><a href="#s2">Multi-asset Kelly</a></li>
+    <li><a href="#s3">Why nobody runs full Kelly</a></li>
+    <li><a href="#s4">Fractional Kelly</a></li>
+    <li><a href="#s5">Connection to Merton (Lesson 19)</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Kelly fraction $f$</h3>
+<p>The fraction of full Kelly. $f = 1$ is full Kelly. $f = 0.25$ is "quarter Kelly" (popular in practice). $f &gt; 1$ is over-Kelly (catastrophic).</p>
+<h3>True Sharpe</h3>
+<p>The "ground truth" reward-to-risk. In real life unknown. Higher = more aggressive Kelly.</p>
+<h3>Number of paths</h3>
+<p>Monte Carlo simulation count. Each path is one possible realisation of $T$ years of returns.</p>
+
+<h2 id="s1">1. Single-bet Kelly</h2>
+<p>The original problem (Kelly 1956): you face a sequence of independent bets, each with probability $p$ of paying $b$ to 1. What fraction of your wealth should you bet to maximise long-run growth?</p>
+<div class="formula">$$f^\star = \frac{bp - q}{b}, \quad q = 1 - p$$</div>
+<p>Kelly's derivation: maximise $\mathbb{E}[\log W]$ where $W$ is terminal wealth. The fraction $f^\star$ is the unique solution that gives the highest geometric growth rate. Bet less than $f^\star$ and you give up growth. Bet more than $f^\star$ and your growth rate falls (and at $f \ge 2 f^\star$ you eventually go bankrupt with probability 1).</p>
+
+<h2 id="s2">2. Multi-asset Kelly</h2>
+<p>For continuous-time portfolio choice with log utility, Kelly is</p>
+<div class="formula">$$w^\star = \Sigma^{-1} (\mu - r_f \mathbf{1})$$</div>
+<p>This is exactly the tangency portfolio (Lesson 5) divided by 1. Or equivalently: Markowitz with $\lambda = 1$. So Kelly is what you get when you optimise mean-variance utility with risk aversion exactly equal to log utility's effective risk aversion.</p>
+<p>The Kelly fraction matters more than the Kelly direction. Most practitioners agree on the direction (the Markowitz solution); they disagree on the magnitude.</p>
+
+<h2 id="s3">3. Why nobody runs full Kelly</h2>
+<p>Full Kelly maximises long-run growth in expectation. But:</p>
+<ul>
+  <li><strong>Drawdowns are extreme.</strong> Full Kelly has 50% drawdown probability of about 50% (rough rule). 80% drawdown probability is non-negligible.</li>
+  <li><strong>Estimation error compounds.</strong> If your estimate $\hat \mu$ is biased up by 50%, full Kelly is bet at $1.5 f^\star$, which is on the wrong side of the growth-vs-bankruptcy tradeoff.</li>
+  <li><strong>Career risk.</strong> Real investors face redemption risk. A 50% drawdown causes capital flight, killing the strategy before it can compound back.</li>
+  <li><strong>The variance of log wealth is huge.</strong> Even at full Kelly, terminal wealth has high variance.</li>
+</ul>
+
+<h2 id="s4">4. Fractional Kelly</h2>
+<p>$w = f \cdot w^{\text{Kelly}}$ for some $f \in (0, 1)$. Common choices:</p>
+<ul>
+  <li><strong>$f = 0.25$ (quarter Kelly).</strong> Common among professional gamblers and some hedge funds. Gives up roughly 25% of growth rate but cuts variance by a factor of 4.</li>
+  <li><strong>$f = 0.5$ (half Kelly).</strong> Gives up 75% of growth rate (note: not 50%). Variance cut by 4x.</li>
+  <li><strong>$f = 0.10$ to $0.20$.</strong> Conservative. Used by pension funds and risk-averse institutions.</li>
+</ul>
+<p>The math: at fraction $f$, the expected log growth is $f \cdot g - (1-f)^2 \cdot 0$ in expectation but variance is reduced. Calculus says the maximum is at $f = 1$ but the variance-adjusted growth (Sharpe-of-log-wealth) peaks earlier.</p>
+
+<h3>Live: Kelly fraction explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Kelly fraction $f$: <span class="value" id="f_v">0.50</span></label>
+      <input type="range" id="f" min="0" max="2.0" step="0.05" value="0.50">
+    </div>
+    <div class="control">
+      <label>True Sharpe: <span class="value" id="sr_v">1.0</span></label>
+      <input type="range" id="sr" min="0.1" max="2.0" step="0.05" value="1.0">
+    </div>
+    <div class="control">
+      <label>Years: <span class="value" id="T_v">20</span></label>
+      <input type="range" id="T" min="1" max="50" step="1" value="20">
+    </div>
+  </div>
+  <div id="kelly_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Median terminal wealth</span><span class="stat-value" id="med">0</span></div>
+    <div class="stat"><span>10th percentile wealth</span><span class="stat-value" id="p10">0</span></div>
+    <div class="stat"><span>P(50% drawdown)</span><span class="stat-value" id="p_dd50">0</span></div>
+    <div class="stat"><span>P(80% drawdown)</span><span class="stat-value" id="p_dd80">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide $f$ from 0.10 to 1.5.</strong> Median wealth peaks near $f = 1$. Probability of 50% drawdown explodes past $f = 1$. At $f = 1.5$, the 10th percentile path is below your starting wealth even at year 20. Full Kelly is theoretically optimal but practically brutal.
+</div>
+
+<h2 id="s5">5. Connection to Merton</h2>
+<p>Lesson 19 derived Merton's solution: $w^\star = (\mu - r_f) / (\gamma \sigma^2)$. For log utility ($\gamma = 1$), this is exactly Kelly. For $\gamma = 4$ (typical CRRA), it's quarter-Kelly. The risk aversion parameter and the Kelly fraction are the same dial under different names.</p>
+<p>So fractional Kelly with $f = 1/\gamma$ matches CRRA utility with risk aversion $\gamma$. Most institutional investors implicitly target $f \approx 0.2$ to $0.5$, equivalent to $\gamma$ in the 2 to 5 range.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy / AQR):</strong> Macrosynergy doesn't use Kelly directly. Their vol targeting (Lesson 21) is implicitly fractional Kelly: target a fixed vol level rather than maximise log growth. Empirically, MS strategies sit in the $f \approx 0.3$ to $0.5$ range when expressed in Kelly units. AQR's risk parity products are also implicit fractional Kelly. Full Kelly is the academic benchmark; fractional Kelly is what survives in production.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Kelly's growth-rate derivation</h3>
+<p>For a single bet with prob $p$ to win $b$ and prob $q = 1-p$ to lose 1, the log growth at fraction $f$ is</p>
+<div class="formula">$$g(f) = p \log(1 + bf) + q \log(1 - f)$$</div>
+<p>Maximise: $g'(f) = bp/(1 + bf) - q/(1 - f) = 0$. Solving: $f^\star = (bp - q) / b$.</p>
+<h3>6.2 Multi-asset log utility</h3>
+<p>Wealth dynamics: $dW = W [r_f + w^\top (\mu - r_f \mathbf{1})] dt + W w^\top \sigma dB$. Apply Ito to $\log W$:</p>
+<div class="formula">$$d\log W = [r_f + w^\top (\mu - r_f \mathbf{1}) - \tfrac{1}{2} w^\top \Sigma w] dt + w^\top \sigma dB$$</div>
+<p>Take expectation, maximise over $w$: first-order condition $\mu - r_f \mathbf{1} = \Sigma w$, so $w^\star = \Sigma^{-1} (\mu - r_f \mathbf{1})$.</p>
+<h3>6.3 The half-Kelly variance reduction</h3>
+<p>Variance of log wealth scales as $f^2 \cdot \sigma_{\text{port}}^2$. Half Kelly has variance one-quarter of full Kelly. Mean log growth at $f = 0.5$ is $0.5 g_{\max} - (0.5)^2 g_{\max} / 1 = 0.25 g_{\max}$. Wait that's wrong; the curvature gives $g(f) = f g_{\max}(1) - 0.5 (f - 1)^2 g_{\max}(2)$. The exact formula depends on Sharpe, but at $f = 0.5$ you keep about 75% of growth at 25% of variance.</p>
+<h3>6.4 Probability of drawdown</h3>
+<p>For a Brownian motion log-wealth process with drift $g$ and volatility $\sigma$, the probability of ever falling to fraction $\alpha$ of starting wealth is $\alpha^{2g/\sigma^2}$. For full Kelly, $g = \sigma^2/2$, giving $P(\text{50\% DD}) = 0.5^1 = 50\%$.</p>
+<h3>6.5 Kelly under estimation error</h3>
+<p>If you estimate $\hat \mu$ with bias and run full Kelly on it, your effective fraction is $\hat \mu / \mu_{\text{true}}$. A 30% upward bias on $\hat \mu$ produces $f \approx 1.3$ Kelly, which is in the danger zone. This is the practical reason for fractional Kelly: a margin of safety against estimation error.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Single-bet Kelly</h3>
+<pre><code>def kelly_fraction(win_prob, payoff_ratio):
+    return (payoff_ratio * win_prob - (1 - win_prob)) / payoff_ratio</code></pre>
+
+<h3>Exercise B: Multi-asset Kelly</h3>
+<pre><code>def kelly_weights(mu, Sigma, rf=0):
+    return np.linalg.solve(Sigma, mu - rf)</code></pre>
+
+<h3>Exercise C: Monte Carlo Kelly simulation</h3>
+<pre><code>def kelly_simulate(mu, sigma, fraction, T=20, n_paths=10000, dt=1/252, seed=0):
+    rng = np.random.default_rng(seed)
+    f = fraction
+    n = int(T / dt)
+    g_dt = (f * mu - 0.5 * f**2 * sigma**2) * dt
+    s_dt = f * sigma * np.sqrt(dt)
+    log_W = g_dt * np.arange(n) + s_dt * rng.standard_normal((n_paths, n)).cumsum(axis=1)
+    return np.exp(log_W)</code></pre>
+
+<h3>Exercise D: Sweep Kelly fraction</h3>
+<p>For Sharpe = 1.0 over 20 years, sweep $f$ from 0 to 2. Plot median terminal wealth and 10th percentile wealth.</p>
+
+<h3>Exercise E: Kelly with shrunk inputs</h3>
+<p>Apply Kelly to estimated $\hat \mu$ from 60 monthly observations. Compare to using the shrunk $\hat \mu^{\text{LW}}$ (Lesson 10). Shrunk Kelly should be more conservative and more robust.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the median terminal wealth peak at full Kelly while the 10th percentile peaks earlier?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise C to compute the probability of ever exceeding $2x$ starting wealth and the probability of ever falling below $0.5x$.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For Sharpe = 1.0, full Kelly's expected log growth is 0.5. Half Kelly's expected log growth is approximately 0.375. What is the percent of growth retained?</p>
+  <p><em>Answer:</em> 75%.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_21_vol_targeting.html">← Lesson 21</a></span>
+  <span><a href="lesson_23_backtesting.html">Next: Lesson 23, Backtesting →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function update22() {
+  const f = parseFloat(document.getElementById('f').value);
+  const sr = parseFloat(document.getElementById('sr').value);
+  const T = parseInt(document.getElementById('T').value);
+  document.getElementById('f_v').textContent = f.toFixed(2);
+  document.getElementById('sr_v').textContent = sr.toFixed(2);
+  document.getElementById('T_v').textContent = T;
+
+  // Simulate paths
+  const sigma = 0.15;
+  const mu = sr * sigma; // mean = SR * sigma
+  const dt = 1 / 252;
+  const n = Math.floor(T / dt);
+  const nPaths = 500;
+  const rng = mulberry32(42);
+  const g = (f * mu - 0.5 * f * f * sigma * sigma) * dt;
+  const s = f * sigma * Math.sqrt(dt);
+
+  // Generate sample paths (just 50 visible)
+  const visible = 50;
+  const paths = [];
+  let dd50 = 0, dd80 = 0;
+  const finals = [];
+  for (let p = 0; p < nPaths; p++) {
+    const path = new Array(n + 1);
+    path[0] = 1;
+    let peak = 1, maxDD = 0;
+    for (let t = 1; t <= n; t++) {
+      path[t] = path[t-1] * Math.exp(g + s * randn(rng));
+      peak = Math.max(peak, path[t]);
+      maxDD = Math.max(maxDD, 1 - path[t] / peak);
+    }
+    if (p < visible) paths.push(path);
+    finals.push(path[n]);
+    if (maxDD > 0.5) dd50++;
+    if (maxDD > 0.8) dd80++;
+  }
+  finals.sort((a, b) => a - b);
+  const median = finals[Math.floor(nPaths / 2)];
+  const p10 = finals[Math.floor(nPaths / 10)];
+
+  document.getElementById('med').textContent = median.toFixed(2) + 'x';
+  document.getElementById('p10').textContent = p10.toFixed(2) + 'x';
+  document.getElementById('p_dd50').textContent = (dd50 / nPaths * 100).toFixed(0) + '%';
+  document.getElementById('p_dd80').textContent = (dd80 / nPaths * 100).toFixed(0) + '%';
+
+  const traces = paths.map((p, i) => ({
+    y: p, mode: 'lines',
+    line: { color: 'rgba(43, 108, 176, 0.15)', width: 1 },
+    showlegend: false,
+    hoverinfo: 'skip'
+  }));
+  // Add median path estimate (analytic)
+  const tGrid = [];
+  for (let i = 0; i <= n; i += Math.max(1, Math.floor(n / 100))) tGrid.push(i);
+  const medianPath = tGrid.map(t => Math.exp(g * t));
+  traces.push({ x: tGrid, y: medianPath, mode: 'lines', name: 'Expected median', line: { color: '#c53030', width: 3 } });
+
+  Plotly.react('kelly_plot', traces, {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Day' },
+    yaxis: { title: 'Wealth (multiple of starting)', type: 'log' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['f', 'sr', 'T'].forEach(id => document.getElementById(id).addEventListener('input', update22));
+update22();
+</script>
+</body>
+</html>

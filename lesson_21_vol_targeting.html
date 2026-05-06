@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 21: Volatility Targeting</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 21: Volatility Targeting</h1>
+<p class="subtitle">Module E, Week 6, Lesson 21. Scale every position by recent realised vol. Almost always improves Sharpe and reduces tail loss. The single most important production technique.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The mechanic</a></li>
+    <li><a href="#s2">EWMA volatility estimation</a></li>
+    <li><a href="#s3">Why vol targeting helps</a></li>
+    <li><a href="#s4">Half-life choice</a></li>
+    <li><a href="#s5">Interaction with momentum</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Target volatility $\sigma_{\text{target}}$</h3>
+<p>Annualised. Common institutional ranges: 6 to 8% for low-risk products, 10 to 12% for typical multi-strategy, 15 to 20% for aggressive.</p>
+<h3>EWMA half-life</h3>
+<p>How fast the vol estimator forgets old data. Macrosynergy default: 11 trading days. RiskMetrics standard: ~30 days. Shorter = more reactive but noisier.</p>
+<h3>Maximum leverage cap</h3>
+<p>Hard ceiling on the leverage multiplier. Prevents runaway leverage when vol falls below normal. Typical: 3x.</p>
+
+<h2 id="s1">1. The mechanic</h2>
+<p>Vol targeting is dead simple:</p>
+<div class="formula">$$w_t = \min\left(L_{\max}, \frac{\sigma_{\text{target}}}{\hat\sigma_t}\right) \cdot w_t^{\text{signal}}$$</div>
+<p>where $\hat \sigma_t$ is your forecast of next period's volatility and $w_t^{\text{signal}}$ is your unscaled signal weight. Computed each rebalancing period, applied to every asset (or to the portfolio as a whole).</p>
+
+<h2 id="s2">2. EWMA volatility estimation</h2>
+<div class="formula">$$\hat\sigma_t^2 = \alpha r_{t-1}^2 + (1 - \alpha) \hat\sigma_{t-1}^2$$</div>
+<p>where $\alpha = 1 - 0.5^{1/h}$ for half-life $h$. The forecaster gives more weight to recent observations, with weights decaying geometrically.</p>
+<p>Critical: $\hat \sigma_t$ uses information up to time $t-1$. No look-ahead bias allowed.</p>
+
+<h2 id="s3">3. Why vol targeting helps</h2>
+<p>Vol targeting cuts position size before drawdowns deepen and increases position size when vol is low. Empirically:</p>
+<ul>
+  <li><strong>Drawdowns shrink.</strong> Volatility tends to spike at the start of crashes; vol targeting de-leverages quickly.</li>
+  <li><strong>Sharpe usually improves.</strong> Moreira and Muir (2017) document Sharpe gains of 0.1 to 0.3 across asset classes from simple vol targeting.</li>
+  <li><strong>Tail risk drops.</strong> By construction, the vol-targeted portfolio has more stable risk over time, reducing kurtosis.</li>
+</ul>
+<p>The mechanism is an "automatic stop-loss": when realised vol jumps, leverage drops. When vol normalises, leverage returns.</p>
+
+<h3>Live: vol target dial</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Target vol (%): <span class="value" id="tgt_v">10</span></label>
+      <input type="range" id="tgt" min="3" max="25" step="0.5" value="10">
+    </div>
+    <div class="control">
+      <label>Half-life (days): <span class="value" id="hl_v">22</span></label>
+      <input type="range" id="hl" min="3" max="100" step="1" value="22">
+    </div>
+    <div class="control">
+      <label>Asset profile: <span class="value" id="ap_v">SPY</span></label>
+      <input type="range" id="ap" min="0" max="2" step="1" value="0">
+    </div>
+  </div>
+  <div id="vt_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Unscaled Sharpe</span><span class="stat-value" id="sr_un">0</span></div>
+    <div class="stat"><span>Vol-targeted Sharpe</span><span class="stat-value" id="sr_vt">0</span></div>
+    <div class="stat"><span>Unscaled max drawdown</span><span class="stat-value" id="dd_un">0</span></div>
+    <div class="stat"><span>Vol-targeted max drawdown</span><span class="stat-value" id="dd_vt">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Set asset profile to BTC.</strong> The unscaled BTC Sharpe is decent but max drawdown approaches 80%. With 10% vol targeting, max drawdown drops to 30 to 40% and Sharpe usually rises. The "free Sharpe" effect is largest for fat-tailed assets.
+</div>
+
+<h2 id="s4">4. Half-life choice</h2>
+<p>Three regimes:</p>
+<ul>
+  <li><strong>Short (5 to 15 days).</strong> Reactive. Catches vol spikes early. High turnover. Macrosynergy default at 11 days.</li>
+  <li><strong>Medium (20 to 40 days).</strong> RiskMetrics default. Balance of responsiveness and stability. Most production systems.</li>
+  <li><strong>Long (60+ days).</strong> Slow. Misses fast regime changes but uses less data. Some pension funds.</li>
+</ul>
+<p>Empirically, short half-lives win in markets with frequent vol regime shifts (post-2008 equity, crypto). Long half-lives win in stable markets. Test on your data.</p>
+
+<h2 id="s5">5. Interaction with momentum</h2>
+<p>AQR (Time Series Momentum, 2012) and Macrosynergy show that vol targeting AND momentum is greater than the sum of parts. Reasons:</p>
+<ul>
+  <li>Momentum positions go long after low-vol up-trending periods, so vol-targeting up-leverages winners.</li>
+  <li>Momentum positions go short or flat in high-vol crashes, so vol-targeting de-leverages just before drawdowns.</li>
+  <li>The combination has positive skew (trend captures upside; vol target avoids tail).</li>
+</ul>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 5, 245):</strong> Article 5 (FX with point-in-time GDP growth) uses 11-day EWMA for vol estimation as the production default. Article 245 ("Volatility-targeted equity allocation") quantifies the effect: SPY with 10% vol target produces 25% Sharpe improvement and 35 to 50% tail risk reduction over the unscaled equivalent. The MS production stack always combines vol targeting with drawdown control (Lesson 16); both layers respond to realised stress.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 The "vol drag" misconception</h3>
+<p>Vol drag is not the reason vol targeting works. The geometric mean is roughly $\mu - \sigma^2/2$. Targeting fixed vol by changing leverage does not eliminate this. The Sharpe gain from vol targeting comes from negative autocorrelation in volatility levels (calm markets stay calm, stressed markets stay stressed) and the asymmetric impact of vol on returns.</p>
+<h3>6.2 The Moreira-Muir Sharpe-improvement formula</h3>
+<p>If realised vol has autocorrelation $\rho_v$, vol targeting Sharpe gain is approximately</p>
+<div class="formula">$$\Delta \text{SR} \approx \rho_v \cdot \text{SR}_{\text{base}} \cdot \nu$$</div>
+<p>where $\nu$ is the relative vol of vol. Empirically $\rho_v \approx 0.7$ on equity indices and $\nu \approx 0.3$, giving 20 to 30% Sharpe improvement.</p>
+<h3>6.3 EWMA mean-reverting properties</h3>
+<p>EWMA volatility is technically integrated GARCH (no constant). Its long-run forecast is undefined; it relies on the most recent shocks. For multi-day forecasts, the EWMA forecast is just $\sigma_t$ for all horizons. Honest but limited.</p>
+<h3>6.4 The "look-ahead trap"</h3>
+<p>Many naive vol-target backtests use $\hat\sigma_t$ computed using $r_t$ in the same period. This produces fake Sharpe gains. Always lag the vol estimate: scale today's position by yesterday's vol.</p>
+<h3>6.5 Vol targeting as a regularizer</h3>
+<p>From an optimisation viewpoint, vol targeting is a constraint $\sqrt{w^\top \Sigma_t w} = \sigma_{\text{target}}$. Combined with mean-variance, it removes one degree of freedom (the magnitude of $w$). The portfolio direction is mean-variance optimal; the magnitude is set by vol target.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: EWMA vol forecaster</h3>
+<pre><code>def ewma_vol(returns: pd.Series, half_life: float = 22) -> pd.Series:
+    alpha = 1 - 0.5 ** (1 / half_life)
+    return returns.ewm(alpha=alpha).std() * np.sqrt(252)</code></pre>
+
+<h3>Exercise B: Apply vol targeting</h3>
+<pre><code>def vol_target(returns: pd.Series, target_vol: float = 0.10, half_life: int = 22, max_lev: float = 3.0):
+    sigma_t = ewma_vol(returns, half_life).shift(1)
+    leverage = (target_vol / sigma_t).clip(upper=max_lev).fillna(1.0)
+    return leverage * returns</code></pre>
+
+<h3>Exercise C: Compare across asset classes</h3>
+<p>Apply 10% vol targeting to SPY, AGG, GLD, BTC. Report the Sharpe gain and max-drawdown reduction for each.</p>
+
+<h3>Exercise D: Half-life sweep</h3>
+<p>Try half-lives from 5 to 60 days on SPY 1990-2025. Plot Sharpe vs half-life. Find the sweet spot.</p>
+
+<h3>Exercise E: Vol targeting + momentum</h3>
+<p>Build a 12-month TSMOM signal. Apply vol targeting to it. Compare to TSMOM alone.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does vol targeting work better on assets with higher kurtosis?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise B to add a maximum daily turnover cap (cannot change leverage by more than 50% in one day).</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For target = 10%, $\hat\sigma_t = 25\%$, what is the leverage multiplier? With $L_{\max} = 3$, what happens when $\hat \sigma_t = 2\%$?</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_20_costs.html">← Lesson 20</a></span>
+  <span><a href="lesson_22_kelly.html">Next: Lesson 22, Kelly →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+const profiles = {
+  0: { name: 'SPY', mu: 0.08, vol: 0.16, df: 5, leverage: -0.4 },
+  1: { name: 'GLD', mu: 0.06, vol: 0.18, df: 6, leverage: 0.0 },
+  2: { name: 'BTC', mu: 0.30, vol: 0.80, df: 3, leverage: -0.2 }
+};
+
+function generateReturns(profile, n=2520, seed=2026) {
+  const rng = mulberry32(seed);
+  const ret = new Array(n);
+  const vol = new Array(n);
+  vol[0] = profile.vol / Math.sqrt(252);
+  for (let t = 0; t < n; t++) {
+    const eps = randn(rng);
+    if (t > 0) {
+      const shock = vol[t-1] * eps;
+      const asym = 1 + Math.abs(profile.leverage) * (shock < 0 ? 1 : 0);
+      vol[t] = Math.sqrt(1e-7 + 0.05 * (shock * asym) ** 2 + 0.93 * vol[t-1] ** 2);
+    }
+    ret[t] = profile.mu / 252 + vol[t] * eps;
+  }
+  return ret;
+}
+
+function applyVolTarget(ret, target, halfLife, maxLev) {
+  const n = ret.length;
+  const alpha = 1 - Math.pow(0.5, 1 / halfLife);
+  const sigma_est = new Array(n);
+  sigma_est[0] = ret[0] * ret[0];
+  for (let t = 1; t < n; t++) sigma_est[t] = alpha * ret[t-1] * ret[t-1] + (1 - alpha) * sigma_est[t-1];
+  const sigma_ann = sigma_est.map(s => Math.sqrt(s * 252));
+  const lev = sigma_ann.map(s => Math.min(maxLev, target / Math.max(s, 0.001)));
+  // Use lagged leverage
+  const adj = ret.map((r, t) => (t === 0 ? r : lev[t-1] * r));
+  return adj;
+}
+
+function stats(ret) {
+  const n = ret.length;
+  const mean = ret.reduce((a, b) => a + b, 0) / n;
+  let v = 0; for (const r of ret) v += (r - mean) ** 2; v /= n;
+  const sigma = Math.sqrt(v);
+  const meanAnn = mean * 252, volAnn = sigma * Math.sqrt(252);
+  // Equity curve
+  const eq = new Array(n + 1); eq[0] = 1;
+  for (let t = 0; t < n; t++) eq[t+1] = eq[t] * (1 + ret[t]);
+  // Max DD
+  let peak = eq[0], maxDD = 0;
+  for (const v of eq) { peak = Math.max(peak, v); maxDD = Math.max(maxDD, 1 - v / peak); }
+  return { sharpe: meanAnn / volAnn, eq, maxDD, volAnn };
+}
+
+function update21() {
+  const tgt = parseFloat(document.getElementById('tgt').value) / 100;
+  const hl = parseFloat(document.getElementById('hl').value);
+  const ap = parseInt(document.getElementById('ap').value);
+  document.getElementById('tgt_v').textContent = (tgt * 100).toFixed(1);
+  document.getElementById('hl_v').textContent = hl;
+  document.getElementById('ap_v').textContent = profiles[ap].name;
+
+  const ret_un = generateReturns(profiles[ap]);
+  const ret_vt = applyVolTarget(ret_un, tgt, hl, 3.0);
+  const s_un = stats(ret_un);
+  const s_vt = stats(ret_vt);
+
+  document.getElementById('sr_un').textContent = s_un.sharpe.toFixed(2);
+  document.getElementById('sr_vt').textContent = s_vt.sharpe.toFixed(2);
+  document.getElementById('dd_un').textContent = (s_un.maxDD * 100).toFixed(1) + '%';
+  document.getElementById('dd_vt').textContent = (s_vt.maxDD * 100).toFixed(1) + '%';
+
+  Plotly.react('vt_plot', [
+    { y: s_un.eq, mode: 'lines', name: 'Unscaled', line: { color: '#c53030', width: 2 } },
+    { y: s_vt.eq, mode: 'lines', name: 'Vol-targeted', line: { color: '#2b6cb0', width: 2 } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Day' },
+    yaxis: { title: 'Equity (growth of $1)', type: 'log' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['tgt', 'hl', 'ap'].forEach(id => document.getElementById(id).addEventListener('input', update21));
+update21();
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 24: Factor Models for Risk and Alpha</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 24: Factor Models for Risk and Alpha</h1>
+<p class="subtitle">Module F, Week 7, Lesson 24. Decompose every return into factor exposures plus idiosyncratic noise. Factor risk dominates portfolio variance. Idiosyncratic risk dominates single-name variance.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The single-index model</a></li>
+    <li><a href="#s2">Multi-factor: Fama-French and Carhart</a></li>
+    <li><a href="#s3">Statistical factors via PCA</a></li>
+    <li><a href="#s4">Fundamental factors: BARRA-style</a></li>
+    <li><a href="#s5">Risk decomposition for portfolios</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Number of factors $K$</h3>
+<p>How many systematic factors. Single-index = 1. FF5 = 5. BARRA = 50 to 80 (industries + styles). Statistical PCA: choose K via Bai-Ng or Marcenko-Pastur cutoff.</p>
+<h3>Idiosyncratic share</h3>
+<p>What fraction of single-name variance is unexplained by factors. Typical: 30 to 60% for single stocks under FF5.</p>
+<h3>Factor type</h3>
+<p>Statistical (PCA), fundamental (BARRA), macroeconomic (Chen-Roll-Ross). Different philosophies, different applications.</p>
+
+<h2 id="s1">1. The single-index model</h2>
+<p>Sharpe (1963): every asset has a beta to the market.</p>
+<div class="formula">$$r_i = \alpha_i + \beta_i r_m + \epsilon_i$$</div>
+<p>Properties:</p>
+<ul>
+  <li>Total risk: $\sigma_i^2 = \beta_i^2 \sigma_m^2 + \sigma_{\epsilon_i}^2$.</li>
+  <li>Systematic risk: $\beta_i^2 \sigma_m^2$.</li>
+  <li>Idiosyncratic risk: $\sigma_{\epsilon_i}^2$.</li>
+  <li>Covariance: $\sigma_{ij} = \beta_i \beta_j \sigma_m^2$.</li>
+</ul>
+<p>The single-index model collapses the $N \times N$ covariance matrix into $2N + 1$ parameters. Massive parsimony for large $N$.</p>
+
+<h2 id="s2">2. Multi-factor: Fama-French and Carhart</h2>
+<p>The CAPM beta is not enough. Fama-French (1993) added size (SMB) and value (HML). Carhart (1997) added momentum (UMD). Fama-French 5-factor (2015) added profitability (RMW) and investment (CMA).</p>
+<div class="formula">$$r_i - r_f = \alpha_i + \beta_{i,M} (r_M - r_f) + \beta_{i,\text{SMB}} \text{SMB} + \beta_{i,\text{HML}} \text{HML} + \ldots + \epsilon_i$$</div>
+<p>The $\alpha_i$ is the "true alpha" after factor exposures. Most managers' alpha shrinks toward zero when measured against FF5+. The factor model is a yardstick: are you actually generating returns above and beyond the systematic styles?</p>
+
+<h2 id="s3">3. Statistical factors via PCA</h2>
+<p>Connor and Korajczyk (1986): for $N$ assets and $T$ observations, the first few principal components of the return covariance matrix are the dominant factors.</p>
+<p>Procedure:</p>
+<ol>
+  <li>Compute $\Sigma$ from sample.</li>
+  <li>Eigendecompose: $\Sigma = V \Lambda V^\top$.</li>
+  <li>Choose $K$ via Bai-Ng or visual inspection of eigenvalue spectrum.</li>
+  <li>Factor returns: $f_t = V_K^\top r_t$.</li>
+  <li>Factor loadings: $B = V_K$.</li>
+</ol>
+<p>Statistical factors have no economic interpretation; they are abstract directions in return space. The first PC almost always looks like the market.</p>
+
+<h2 id="s4">4. Fundamental factors: BARRA</h2>
+<p>BARRA (Rosenberg 1974) defined factors by observable characteristics:</p>
+<ul>
+  <li><strong>Style factors:</strong> size, value, growth, momentum, quality, low volatility.</li>
+  <li><strong>Industry factors:</strong> 50+ GICS sub-industries.</li>
+  <li><strong>Country and currency factors:</strong> for global universes.</li>
+</ul>
+<p>Loadings come from observables (market cap, P/B, past returns, GICS code). Factor returns are estimated from cross-sectional regressions of $r_i$ on $B_i$ each period. Industry standard for equity risk models since the 1980s.</p>
+
+<h2 id="s5">5. Risk decomposition for portfolios</h2>
+<p>Given the factor model $\Sigma = B \Omega_F B^\top + D$:</p>
+<div class="formula">$$\sigma_p^2 = \underbrace{(B^\top w)^\top \Omega_F (B^\top w)}_{\text{factor risk}} + \underbrace{w^\top D w}_{\text{idiosyncratic risk}}$$</div>
+<p>For a typical 30-stock long-only equity portfolio, factor risk is 70 to 90% of total. Idiosyncratic averages out by diversification, leaving factor exposures as the dominant risk.</p>
+<p>Within factor risk, decompose further by factor:</p>
+<div class="formula">$$\text{factor risk}_k = (B^\top w)_k \cdot (\Omega_F B^\top w)_k$$</div>
+<p>This tells you which factors carry the portfolio's risk. Typical finding for long-only equity: 50 to 80% market, 5 to 15% size, 5 to 15% value, etc.</p>
+
+<h3>Live: factor risk decomposition</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Portfolio market beta: <span class="value" id="bm_v">1.00</span></label>
+      <input type="range" id="bm" min="0" max="2" step="0.05" value="1.0">
+    </div>
+    <div class="control">
+      <label>Portfolio value tilt: <span class="value" id="bv_v">0.20</span></label>
+      <input type="range" id="bv" min="-0.5" max="0.5" step="0.05" value="0.20">
+    </div>
+    <div class="control">
+      <label>Portfolio momentum tilt: <span class="value" id="bmo_v">0.10</span></label>
+      <input type="range" id="bmo" min="-0.5" max="0.5" step="0.05" value="0.10">
+    </div>
+    <div class="control">
+      <label>Idiosyncratic share: <span class="value" id="idio_v">0.20</span></label>
+      <input type="range" id="idio" min="0" max="0.5" step="0.05" value="0.20">
+    </div>
+  </div>
+  <div id="factor_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Total portfolio vol</span><span class="stat-value" id="tot_vol">0</span></div>
+    <div class="stat"><span>Factor risk share</span><span class="stat-value" id="fac_share">0</span></div>
+    <div class="stat"><span>Largest factor contributor</span><span class="stat-value" id="top_fac">0</span></div>
+    <div class="stat"><span>Idiosyncratic vol</span><span class="stat-value" id="idio_vol">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Set value tilt to +0.5.</strong> Factor risk attribution shifts: market shrinks, value rises. This is what BARRA risk attribution does in production. The risk decomposition tells you which exposures you are unintentionally taking.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 47, 74, 16):</strong> Article 47 builds macro factor models for sectoral equity. Article 74 finds latent trading factors via PCA on returns. Article 16 uses dimension reduction for macro factor extraction. MS combines macroeconomic factors (growth, inflation, monetary, financial conditions) with statistical factors. The risk model is fundamental + statistical hybrid. Used both for risk attribution and as the prior for signal blending (Lesson 26).
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Single-index model derivation</h3>
+<p>Regress $r_i = \alpha_i + \beta_i r_m + \epsilon_i$ via OLS. The estimated $\hat \beta_i$ is $\text{Cov}(r_i, r_m) / \text{Var}(r_m)$. This is also the slope of the line through the data.</p>
+<h3>6.2 Bai-Ng criterion for choosing K</h3>
+<p>Information criterion that trades off explained variance (more factors better) against parsimony (fewer factors better). Choose K to minimise $\log(\text{SSR}_K) + K \cdot \frac{N + T}{NT} \log\left(\frac{NT}{N+T}\right)$.</p>
+<h3>6.3 BARRA cross-sectional regression</h3>
+<p>At each date $t$: stack assets, run $r_t = B f_t + \epsilon_t$ where $B$ is fixed (loadings from observables) and $f_t$ are estimated factor returns. Standard OLS. Repeat each period.</p>
+<h3>6.4 Idiosyncratic risk diversification</h3>
+<p>For an equal-weight portfolio of $N$ assets with average idiosyncratic vol $\sigma_\epsilon$, portfolio idiosyncratic vol is $\sigma_\epsilon / \sqrt{N}$ (assuming uncorrelated residuals). For $N = 30$: idiosyncratic vol is 18% of single-name idiosyncratic vol. Most of the diversification benefit is in idiosyncratic risk.</p>
+<h3>6.5 Macroeconomic factor models</h3>
+<p>Chen, Roll, Ross (1986) show that macro factors (industrial production growth, inflation surprise, term-spread, default-spread) have non-trivial cross-asset exposures. Predates BARRA's empirical-loading approach.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Single-index regression</h3>
+<pre><code>def single_index(returns: pd.DataFrame, market: pd.Series) -> dict:
+    betas, alphas = {}, {}
+    for col in returns.columns:
+        cov = returns[col].cov(market)
+        beta = cov / market.var()
+        alpha = returns[col].mean() - beta * market.mean()
+        betas[col] = beta
+        alphas[col] = alpha
+    return {'betas': betas, 'alphas': alphas}</code></pre>
+
+<h3>Exercise B: Fama-French 5-factor regression</h3>
+<pre><code>import statsmodels.api as sm
+def ff5_regression(portfolio_returns, factor_returns):
+    X = sm.add_constant(factor_returns)
+    model = sm.OLS(portfolio_returns, X).fit()
+    return model.params, model.tvalues</code></pre>
+
+<h3>Exercise C: PCA factors</h3>
+<pre><code>from sklearn.decomposition import PCA
+pca = PCA(n_components=5)
+factors = pca.fit_transform(returns_df.fillna(0))
+loadings = pca.components_</code></pre>
+
+<h3>Exercise D: Risk decomposition</h3>
+<pre><code>def factor_risk_decomposition(w, B, Omega_F, D):
+    factor_exp = B.T @ w
+    factor_var = factor_exp @ Omega_F @ factor_exp
+    idio_var = w @ D @ w
+    total_var = factor_var + idio_var
+    return {
+        'factor_var': factor_var,
+        'idio_var': idio_var,
+        'factor_share': factor_var / total_var
+    }</code></pre>
+
+<h3>Exercise E: Build a synthetic BARRA-style model</h3>
+<p>Generate fake factor returns and loadings. Project a portfolio onto the factor space. Verify the risk decomposition matches direct portfolio variance.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the single-index model collapse the $N \times N$ covariance into $2N + 1$ parameters?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Apply Exercise B to a portfolio of 10 stocks. Identify which has the largest residual alpha and which has the largest market beta.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For a 30-stock equal-weight portfolio with average market beta 1.0 and idiosyncratic vol 25%, what fraction of portfolio risk is factor (assume market vol 16%)?</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_23_backtesting.html">← Lesson 23</a></span>
+  <span><a href="lesson_25_constraints_te.html">Next: Lesson 25, Mandate constraints →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function update24() {
+  const bm = parseFloat(document.getElementById('bm').value);
+  const bv = parseFloat(document.getElementById('bv').value);
+  const bmo = parseFloat(document.getElementById('bmo').value);
+  const idioShare = parseFloat(document.getElementById('idio').value);
+  document.getElementById('bm_v').textContent = bm.toFixed(2);
+  document.getElementById('bv_v').textContent = bv.toFixed(2);
+  document.getElementById('bmo_v').textContent = bmo.toFixed(2);
+  document.getElementById('idio_v').textContent = idioShare.toFixed(2);
+
+  // Factor vols (annualised)
+  const sigma_market = 0.16, sigma_size = 0.10, sigma_value = 0.10, sigma_mom = 0.10, sigma_qual = 0.08;
+  // Pretend a constant size and quality exposure to fill out 5 factors
+  const bs = 0.05, bq = 0.05;
+
+  const factorVars = {
+    'Market': bm * bm * sigma_market * sigma_market,
+    'Size': bs * bs * sigma_size * sigma_size,
+    'Value': bv * bv * sigma_value * sigma_value,
+    'Momentum': bmo * bmo * sigma_mom * sigma_mom,
+    'Quality': bq * bq * sigma_qual * sigma_qual
+  };
+  const factorTotal = Object.values(factorVars).reduce((a, b) => a + b, 0);
+  const idioVar = factorTotal / (1 - idioShare) * idioShare;
+  const totalVar = factorTotal + idioVar;
+  const totVol = Math.sqrt(totalVar);
+  const facShare = factorTotal / totalVar;
+  // Find top factor
+  let top = ''; let topVal = 0;
+  for (const k of Object.keys(factorVars)) if (factorVars[k] > topVal) { topVal = factorVars[k]; top = k; }
+
+  document.getElementById('tot_vol').textContent = (totVol * 100).toFixed(2) + '%';
+  document.getElementById('fac_share').textContent = (facShare * 100).toFixed(0) + '%';
+  document.getElementById('top_fac').textContent = top + ' (' + (topVal / totalVar * 100).toFixed(0) + '%)';
+  document.getElementById('idio_vol').textContent = (Math.sqrt(idioVar) * 100).toFixed(2) + '%';
+
+  const labels = Object.keys(factorVars).concat(['Idiosyncratic']);
+  const values = Object.values(factorVars).concat([idioVar]);
+  const shares = values.map(v => v / totalVar * 100);
+
+  Plotly.react('factor_plot', [
+    { labels: labels, values: shares, type: 'pie', marker: { colors: ['#2b6cb0','#90cdf4','#dd6b20','#22543d','#805ad5','#cbd5e0'] } }
+  ], {
+    margin: { l: 20, r: 20, t: 30, b: 20 },
+    title: 'Risk decomposition (% of total variance)',
+    showlegend: true
+  }, { displayModeBar: false });
+}
+['bm', 'bv', 'bmo', 'idio'].forEach(id => document.getElementById(id).addEventListener('input', update24));
+update24();
+</script>
+</body>
+</html>

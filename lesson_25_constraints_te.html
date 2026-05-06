@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 25: Mandate Constraints and Tracking Error</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 25: Mandate Constraints and Tracking Error</h1>
+<p class="subtitle">Module F, Week 7, Lesson 25. Real portfolios are managed against benchmarks with constraints on tracking error, beta, sector, country, ESG. These are not options. They are constraints.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Active weights and tracking error</a></li>
+    <li><a href="#s2">Active mean-variance</a></li>
+    <li><a href="#s3">Beta neutrality</a></li>
+    <li><a href="#s4">Sector and country caps</a></li>
+    <li><a href="#s5">ESG and other constraints</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Tracking error budget (% per year)</h3>
+<p>How much active risk you allow. Index funds: 0.1 to 0.5%. Closet indexers: 1 to 2%. Active long-only: 3 to 6%. Hedge funds: 6 to 15%.</p>
+<h3>Beta target</h3>
+<p>Portfolio beta to benchmark. 1.0 means market-neutral exposure to benchmark; 0 means market-neutral. Long-short funds typically target 0 to 0.3.</p>
+<h3>Sector cap</h3>
+<p>Max active weight per sector. Common: 5% per sector overweight or underweight relative to benchmark.</p>
+
+<h2 id="s1">1. Active weights and tracking error</h2>
+<p>Define active weight $a = w - w_b$ where $w_b$ is the benchmark. The active return is $a^\top r$ and the tracking error (TE) is</p>
+<div class="formula">$$\text{TE} = \sqrt{a^\top \Sigma a}$$</div>
+<p>Properties:</p>
+<ul>
+  <li>$\sum_i a_i = 0$ (active weights sum to zero by construction).</li>
+  <li>TE $\to 0$ as $w \to w_b$.</li>
+  <li>For a long-only fund, $a_i \ge -w_{b,i}$ (cannot underweight more than the full benchmark weight).</li>
+</ul>
+
+<h2 id="s2">2. Active mean-variance</h2>
+<p>The standard active-management problem:</p>
+<div class="formula">$$\max_a \, \alpha^\top a - \tfrac{\lambda}{2} a^\top \Sigma a$$</div>
+<p>subject to $\sum a = 0$ and any mandate constraints. Here $\alpha$ is the alpha vector (your forecast of asset excess returns above benchmark expectations).</p>
+<p>Or, with explicit TE budget:</p>
+<div class="formula">$$\max_a \, \alpha^\top a \quad \text{s.t.} \quad \sqrt{a^\top \Sigma a} \le \text{TE}^\star, \, \mathbf{1}^\top a = 0$$</div>
+<p>This is a SOCP. Convex, tractable. The Lagrange multiplier on the TE constraint tells you the "price" of risk: how much $\alpha$ would you trade per unit of TE.</p>
+
+<h2 id="s3">3. Beta neutrality</h2>
+<p>Constraint: $a^\top \beta = 0$ (active portfolio has zero beta to the benchmark). Common in long-short and market-neutral funds.</p>
+<p>Implementation: linear constraint on $a$. With cvxpy: <code>cons.append(beta @ a == 0)</code>.</p>
+<p>Why beta-neutralise? Two reasons:</p>
+<ol>
+  <li>Performance attribution. The remaining returns are pure alpha, not market exposure.</li>
+  <li>Risk budgeting. Beta exposure is "cheap" (you can buy it via futures); active alpha is expensive.</li>
+</ol>
+
+<h2 id="s4">4. Sector and country caps</h2>
+<p>Linear constraints: $\sum_{i \in S} a_i \le c_S$ for each sector or country $S$.</p>
+<p>Common in long-only mandates where the portfolio manager wants to bet on stock selection within sectors but not on sector tilt. "Sector neutral" means $c_S = 0$ for all $S$.</p>
+
+<h2 id="s5">5. ESG and other constraints</h2>
+<p>Modern mandates often include:</p>
+<ul>
+  <li><strong>Carbon intensity cap:</strong> $\sum w_i c_i \le \bar c$ where $c_i$ is asset $i$'s carbon footprint.</li>
+  <li><strong>Exclusion lists:</strong> $w_i = 0$ for assets in a banned set (tobacco, weapons, etc.).</li>
+  <li><strong>ESG score floor:</strong> $\sum w_i e_i \ge \bar e$ where $e_i$ is an ESG score.</li>
+  <li><strong>Turnover cap:</strong> $\| w - w_{\text{old}} \|_1 \le \bar t$ per year.</li>
+</ul>
+<p>Each is a linear constraint (or quadratic in the case of TE). Add to the optimisation directly. Cost: each binding constraint reduces the achievable IR.</p>
+
+<h3>Live: mandate-constrained optimiser</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>TE budget (% / yr): <span class="value" id="te_v">3.0</span></label>
+      <input type="range" id="te" min="0.5" max="10" step="0.5" value="3.0">
+    </div>
+    <div class="control">
+      <label>Beta target: <span class="value" id="bt_v">1.00</span></label>
+      <input type="range" id="bt" min="0" max="1.5" step="0.05" value="1.0">
+    </div>
+    <div class="control">
+      <label>Max sector tilt (%): <span class="value" id="sec_v">5</span></label>
+      <input type="range" id="sec" min="0.5" max="15" step="0.5" value="5">
+    </div>
+    <div class="control">
+      <label>Alpha confidence: <span class="value" id="alpha_conf_v">1.0</span></label>
+      <input type="range" id="alpha_conf" min="0.1" max="3.0" step="0.1" value="1.0">
+    </div>
+  </div>
+  <div id="te_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Active risk realised</span><span class="stat-value" id="te_real">0</span></div>
+    <div class="stat"><span>Information ratio</span><span class="stat-value" id="ir">0</span></div>
+    <div class="stat"><span>Largest active position</span><span class="stat-value" id="max_a">0</span></div>
+    <div class="stat"><span>Binding constraints</span><span class="stat-value" id="binding">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Drop the TE budget from 6 to 1.</strong> The active weights compress toward the benchmark. The IR holds up reasonably (high IC strategies survive low TE) but absolute alpha collapses. Each constraint costs basis points; counting them tells you why your boutique beats the benchmark by less than you expected.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 15):</strong> Article 15 ("A macro-quantamental scorecard for global equities") is the closest MS analog to a mandate-constrained product: country-level scorecards used to tilt a global equity benchmark. The TE budget is implicit (vol-targeted at the active position level). MS does not optimise the active weights with a constrained QP; they apply the scorecard as a tilt and let the magnitude come from the macro signal strength. This is "constraint-by-construction" rather than "constraint-via-optimisation".
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Active mean-variance closed form</h3>
+<p>Without TE budget, the active-MV solution is $a^\star \propto \Sigma^{-1} \alpha - (\mathbf{1}^\top \Sigma^{-1} \alpha / \mathbf{1}^\top \Sigma^{-1} \mathbf{1}) \Sigma^{-1} \mathbf{1}$. The second term enforces $\sum a = 0$. With a TE budget, scale the unconstrained solution to hit the budget: $a = c a^{\text{unc}}$ where $c = \text{TE}^\star / \sqrt{a^{\text{unc}\top} \Sigma a^{\text{unc}}}$.</p>
+<h3>6.2 Grinold-Kahn fundamental law</h3>
+<p>$\text{IR} = \text{IC} \cdot \sqrt{\text{breadth}} \cdot \text{TC}$ where TC is the transfer coefficient (how cleanly your alpha translates to active weights given constraints). Constraints reduce TC. A long-only fund typically has TC around 0.5; a true long-short has TC near 1.</p>
+<h3>6.3 The shadow price of TE</h3>
+<p>Lagrange multiplier on the TE constraint = the marginal alpha per unit of TE. Equals the "TE Sharpe" at the boundary.</p>
+<h3>6.4 ESG scoring as quadratic</h3>
+<p>Some ESG frameworks use a "carbon gradient": prefer not just lower carbon but lower carbon variance. Quadratic ESG constraint: $w^\top E w \le \bar e^2$. SOCP again.</p>
+<h3>6.5 Why long-only constraints reduce TC dramatically</h3>
+<p>For a 100-stock universe with equal weights, long-only constraint ($a_i \ge -1/100$) caps each underweight at 1%. If your alpha says short by 2% per stock, you can only express 50% of that view. TC drops to ~0.5.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Active MV with cvxpy</h3>
+<pre><code>import cvxpy as cp
+def active_mv(alpha, Sigma, w_b, te_budget, beta=None, beta_target=None):
+    n = len(alpha)
+    a = cp.Variable(n)
+    obj = cp.Maximize(alpha @ a)
+    cons = [cp.sum(a) == 0, cp.quad_form(a, Sigma) <= te_budget ** 2]
+    if beta is not None and beta_target is not None:
+        cons.append(beta @ (a + w_b) == beta_target)
+    cp.Problem(obj, cons).solve()
+    return a.value</code></pre>
+
+<h3>Exercise B: Long-only constraint</h3>
+<p>Add $w_i = a_i + w_{b,i} \ge 0$ to Exercise A. Compare the resulting active weights and IR to unconstrained.</p>
+
+<h3>Exercise C: Sector neutrality</h3>
+<p>For 30 stocks across 6 sectors, add $\sum_{i \in S} a_i = 0$ for each sector. Solve. Report the active sector tilts (should be zero) and within-sector tilts.</p>
+
+<h3>Exercise D: Carbon constraint</h3>
+<p>Each asset has a carbon-intensity score $c_i$. Add $w^\top c \le 0.7 \cdot w_b^\top c$ (30% reduction). Solve. Report the alpha cost.</p>
+
+<h3>Exercise E: Build the (alpha, TE) frontier</h3>
+<p>Sweep TE budget from 0 to 10%. Plot achievable alpha. The curve is concave; interior optimum where alpha gain per TE matches your risk aversion.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the long-only constraint on a fund with 100 stocks reduce the transfer coefficient to ~0.5?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Add an ESG score floor to Exercise A: $\sum w_i \cdot e_i \ge 0.5$ where $e_i \in [-1, 1]$. Test on synthetic data.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For TE budget = 3% and IC = 0.05 across 50 names, what is the achievable IR? Use Grinold-Kahn with TC = 0.7 (typical long-only).</p>
+  <p><em>Answer:</em> $\text{IR} = 0.05 \cdot \sqrt{50} \cdot 0.7 \approx 0.25$. Modest by hedge-fund standards, decent for long-only.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_24_factor_models.html">← Lesson 24</a></span>
+  <span>Module F, Lesson 26 (Signal blending) coming next.</span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 8;
+const sectors = ['Tech', 'Tech', 'Fin', 'Fin', 'Health', 'Health', 'Energy', 'Energy'];
+const sigma_v = [0.22, 0.20, 0.18, 0.18, 0.16, 0.18, 0.25, 0.27];
+const beta_v = [1.2, 1.3, 0.9, 0.95, 0.7, 0.75, 1.4, 1.3];
+const w_b = new Array(N).fill(1 / N);
+
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+function buildSigma() {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) {
+      const rho = i === j ? 1 : (sectors[i] === sectors[j] ? 0.6 : 0.3);
+      r.push(sigma_v[i] * sigma_v[j] * rho);
+    }
+    S.push(r);
+  }
+  return S;
+}
+const Sigma = buildSigma();
+
+function activeMV(alpha, te, betaTarget, secCap) {
+  // Simple projected gradient descent
+  let a = new Array(N).fill(0);
+  const lr = 0.01;
+  for (let it = 0; it < 3000; it++) {
+    // Gradient of -alpha' a + lambda(TE - sqrt(a Sigma a))
+    const Sa = matVec(Sigma, a);
+    const aSa = dot(a, Sa);
+    const teReal = Math.sqrt(Math.max(aSa, 0));
+    // Move toward alpha but constrained to TE
+    const step = alpha.map((g, i) => g - 0.5 * Sa[i] * (teReal > te * 1.001 ? 1 / Math.max(teReal, 0.001) * 5 : 0));
+    for (let i = 0; i < N; i++) a[i] += lr * step[i];
+    // Project: sum to zero
+    const meanA = a.reduce((x, y) => x + y, 0) / N;
+    a = a.map(x => x - meanA);
+    // Sector caps
+    const secs = [...new Set(sectors)];
+    for (const s of secs) {
+      const idx = sectors.map((sec, i) => sec === s ? i : -1).filter(i => i >= 0);
+      const sum = idx.map(i => a[i]).reduce((x, y) => x + y, 0);
+      if (Math.abs(sum) > secCap) {
+        const adj = (sum - Math.sign(sum) * secCap) / idx.length;
+        for (const i of idx) a[i] -= adj;
+      }
+    }
+    // Beta target via portfolio = w_b + a
+    const portBeta = dot(w_b.map((wb, i) => wb + a[i]), beta_v);
+    const adjB = (portBeta - betaTarget) / N;
+    for (let i = 0; i < N; i++) a[i] -= adjB / Math.max(1, Math.abs(beta_v[i]));
+    // Re-center sum
+    const m2 = a.reduce((x, y) => x + y, 0) / N;
+    a = a.map(x => x - m2);
+    // Scale to TE
+    const newSa = matVec(Sigma, a);
+    const newTE = Math.sqrt(Math.max(dot(a, newSa), 0));
+    if (newTE > te) a = a.map(x => x * te / newTE);
+  }
+  return a;
+}
+
+function update25() {
+  const te = parseFloat(document.getElementById('te').value) / 100;
+  const bt = parseFloat(document.getElementById('bt').value);
+  const secCap = parseFloat(document.getElementById('sec').value) / 100;
+  const conf = parseFloat(document.getElementById('alpha_conf').value);
+  document.getElementById('te_v').textContent = (te * 100).toFixed(1);
+  document.getElementById('bt_v').textContent = bt.toFixed(2);
+  document.getElementById('sec_v').textContent = (secCap * 100).toFixed(1);
+  document.getElementById('alpha_conf_v').textContent = conf.toFixed(1);
+
+  // Synthetic alpha
+  const alpha = [0.04, -0.02, 0.03, -0.03, 0.05, -0.02, 0.04, -0.05].map(x => x * conf);
+
+  const a = activeMV(alpha, te, bt, secCap);
+  const Sa = matVec(Sigma, a);
+  const teReal = Math.sqrt(Math.max(dot(a, Sa), 0));
+  const ir = dot(alpha, a) / Math.max(teReal, 0.001);
+  let bind = 0;
+  if (Math.abs(teReal - te) < te * 0.05) bind++;
+  // Sector binding
+  const secs = [...new Set(sectors)];
+  for (const s of secs) {
+    const idx = sectors.map((sec, i) => sec === s ? i : -1).filter(i => i >= 0);
+    const sum = Math.abs(idx.map(i => a[i]).reduce((x, y) => x + y, 0));
+    if (Math.abs(sum - secCap) < secCap * 0.05) bind++;
+  }
+
+  document.getElementById('te_real').textContent = (teReal * 100).toFixed(2) + '%';
+  document.getElementById('ir').textContent = ir.toFixed(2);
+  document.getElementById('max_a').textContent = (Math.max(...a.map(x => Math.abs(x))) * 100).toFixed(1) + '%';
+  document.getElementById('binding').textContent = bind;
+
+  Plotly.react('te_plot', [
+    { x: ['A1','A2','A3','A4','A5','A6','A7','A8'], y: w_b.map(x => x * 100), type: 'bar', name: 'Benchmark', marker: { color: '#cbd5e0' } },
+    { x: ['A1','A2','A3','A4','A5','A6','A7','A8'], y: a.map((x, i) => (w_b[i] + x) * 100), type: 'bar', name: 'Active portfolio', marker: { color: '#2b6cb0' } },
+    { x: ['A1','A2','A3','A4','A5','A6','A7','A8'], y: a.map(x => x * 100), type: 'bar', name: 'Active tilt', marker: { color: '#c05621' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    barmode: 'group',
+    yaxis: { title: 'Weight (%)' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['te', 'bt', 'sec', 'alpha_conf'].forEach(id => document.getElementById(id).addEventListener('input', update25));
+update25();
+</script>
+</body>
+</html>

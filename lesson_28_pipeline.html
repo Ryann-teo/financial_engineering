@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 28: Pipeline Architecture</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+  .layer-card { background: white; border: 1px solid #e2e8f0; border-left: 4px solid #2b6cb0; border-radius: 6px; padding: 1rem 1.2rem; margin: 0.6rem 0; }
+  .layer-card h4 { color: #2b6cb0; margin-bottom: 0.3rem; }
+  .layer-card p { color: #4a5568; margin: 0.3rem 0; font-size: 0.95rem; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 28: Pipeline Architecture</h1>
+<p class="subtitle">Module G, Week 8, Lesson 28. The full systematic portfolio pipeline. Data layer, signal layer, forecast layer, optimisation, risk, execution, monitoring. The chassis of every working strategy.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s1">The seven-layer architecture</a></li>
+    <li><a href="#s2">Data layer</a></li>
+    <li><a href="#s3">Signal layer</a></li>
+    <li><a href="#s4">Forecast layer</a></li>
+    <li><a href="#s5">Optimisation layer</a></li>
+    <li><a href="#s6">Risk layer</a></li>
+    <li><a href="#s7">Execution layer</a></li>
+    <li><a href="#s8">Monitoring layer</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s1">1. The seven-layer architecture</h2>
+<p>Every systematic strategy can be decomposed into seven layers, each with a distinct contract. Get one wrong and the whole stack fails.</p>
+
+<div class="layer-card">
+  <h4>Layer 1: Data</h4>
+  <p>Raw inputs: prices, fundamentals, macro indicators, vintages. Point-in-time. Survivorship-cleaned.</p>
+</div>
+<div class="layer-card">
+  <h4>Layer 2: Signal</h4>
+  <p>Transformations: returns, z-scores, ranks, smoothing. The macro themes per asset class.</p>
+</div>
+<div class="layer-card">
+  <h4>Layer 3: Forecast</h4>
+  <p>Combine signals into expected returns. Equal weight, IC weight, ML aggregation.</p>
+</div>
+<div class="layer-card">
+  <h4>Layer 4: Optimisation</h4>
+  <p>Convert forecasts into target weights. Markowitz, ERC, HRP, sigmoid sizing.</p>
+</div>
+<div class="layer-card">
+  <h4>Layer 5: Risk</h4>
+  <p>Vol target, drawdown control, factor exposure caps, mandate constraints.</p>
+</div>
+<div class="layer-card">
+  <h4>Layer 6: Execution</h4>
+  <p>Rebalancing rule, order generation, slippage modelling, FX hedging.</p>
+</div>
+<div class="layer-card">
+  <h4>Layer 7: Monitoring</h4>
+  <p>Live diagnostics: signal IC, ex-ante vol, factor drift, drawdown alarm.</p>
+</div>
+
+<h2 id="s2">2. Data layer</h2>
+<p>Garbage in, garbage out. Three rules:</p>
+<ol>
+  <li><strong>Point-in-time vintages.</strong> Macro releases get revised. Use the data as it was known at time $t$, not as revised today.</li>
+  <li><strong>Survivorship cleaning.</strong> Include delisted assets in historical universes. Otherwise you back-test on winners.</li>
+  <li><strong>Time-zone alignment.</strong> A "daily" return for a US asset is from 16:00 ET to 16:00 ET. For Asia, different. Misalign and you get hindsight bias.</li>
+</ol>
+
+<h2 id="s3">3. Signal layer</h2>
+<p>Each signal is a time-asset matrix $S_{ti}$. Standard transforms:</p>
+<ul>
+  <li>Z-score within date and within universe panel.</li>
+  <li>Cap at $\pm 2$ to $\pm 3$ SD.</li>
+  <li>Smooth via EWMA if signal is noisy.</li>
+  <li>Convert to rank if you want robustness to outliers.</li>
+</ul>
+<p>The signal layer outputs a clean numerical signal in the range $\pm 1$ or $\pm 2$. No information about position size yet.</p>
+
+<h2 id="s4">4. Forecast layer</h2>
+<p>Take signals, output expected returns. Three ways:</p>
+<ul>
+  <li><strong>Equal weight composite.</strong> Macrosynergy default.</li>
+  <li><strong>Regression-based.</strong> Train signal-to-return mapping with ridge or lasso (Lesson 10).</li>
+  <li><strong>ML.</strong> Random forest, gradient boosting, neural net.</li>
+</ul>
+<p>Output: $\hat \mu_t$, the expected return vector for period $t+1$.</p>
+
+<h2 id="s5">5. Optimisation layer</h2>
+<p>Convert $\hat \mu_t$ into target weights $w_t^*$. Choose:</p>
+<ul>
+  <li>Markowitz mean-variance (with shrinkage, BL, or robust).</li>
+  <li>Risk parity / ERC (no $\hat \mu$ used).</li>
+  <li>HRP (no inversion of $\Sigma$).</li>
+  <li>Sigmoid sizing (signal directly to position).</li>
+</ul>
+<p>Macrosynergy default: sigmoid sizing on the signal, no MV optimisation. Conceptual parity within and across themes.</p>
+
+<h2 id="s6">6. Risk layer</h2>
+<p>Apply on top of optimisation:</p>
+<ol>
+  <li>Vol target the strategy at, say, 10% (Lesson 21).</li>
+  <li>Cap leverage at $L_{\max}$.</li>
+  <li>Drawdown control: scale down if rolling DD &gt; threshold (Lesson 16).</li>
+  <li>Factor exposure caps if mandated (Lesson 25).</li>
+</ol>
+<p>The risk layer is the difference between a backtest and a deployed system. Most blowups happen here.</p>
+
+<h2 id="s7">7. Execution layer</h2>
+<ul>
+  <li>Rebalance frequency: daily, weekly, monthly. Match signal half-life.</li>
+  <li>No-trade band (Lesson 20). Don't trade tiny weight changes.</li>
+  <li>Cost model: linear + square-root impact.</li>
+  <li>FX hedging: convert all PnL to base currency.</li>
+</ul>
+
+<h2 id="s8">8. Monitoring layer</h2>
+<p>Live diagnostics that fire alerts:</p>
+<ul>
+  <li>Rolling 6 to 12 month signal IC vs historical.</li>
+  <li>Realised vs target vol.</li>
+  <li>Factor exposure drift vs targets.</li>
+  <li>Top 10 PnL contributors and detractors.</li>
+  <li>Drawdown alarm at DD &gt; 15%.</li>
+</ul>
+<p>Monitoring is where strategies die quietly: you can't fix problems you can't see.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 39):</strong> Article 39 ("How to build a macro trading strategy with open-source python") is the canonical MS pipeline reference. It documents the seven-layer stack with code. The MS open-source `macrosynergy` Python package implements layers 1 to 4. Layers 5 to 7 are typically built per-product. The whole flagship art 3 strategy is constructed using this exact architecture.
+</div>
+
+<h2 id="s_code">9. Coding exercises (extras)</h2>
+
+<h3>Exercise A: Pipeline class skeleton</h3>
+<pre><code>from dataclasses import dataclass
+import pandas as pd
+
+@dataclass
+class Config:
+    universe: list[str]
+    rebalance: str = 'monthly'
+    target_vol: float = 0.10
+    max_lev: float = 3.0
+    cost_bp: float = 10
+    dd_threshold: float = 0.10
+
+class Pipeline:
+    def __init__(self, config: Config, data: dict):
+        self.config = config
+        self.data = data
+    def signal(self) -> pd.DataFrame: ...
+    def forecast(self) -> pd.DataFrame: ...
+    def optimise(self) -> pd.DataFrame: ...
+    def risk(self, w) -> pd.DataFrame: ...
+    def execute(self, w) -> pd.Series: ...
+    def monitor(self, returns) -> dict: ...
+    def run(self):
+        s = self.signal()
+        f = self.forecast()
+        w = self.optimise()
+        w = self.risk(w)
+        ret = self.execute(w)
+        diag = self.monitor(ret)
+        return ret, diag</code></pre>
+
+<h3>Exercise B: Implement each layer end-to-end</h3>
+<p>Build a pipeline for a single signal (e.g. trend) on 5 assets. Implement each layer minimally. Verify layers can be swapped.</p>
+
+<h3>Exercise C: Add a new signal without breaking the pipeline</h3>
+<p>Extend the pipeline to combine 3 signals. The forecast layer should accept any number of signals.</p>
+
+<h3>Exercise D: Build the monitoring dashboard</h3>
+<p>Compute rolling IC, realised vol vs target, drawdown. Plot live.</p>
+
+<h3>Exercise E: Failure mode injection</h3>
+<p>Simulate a "bad data" scenario (e.g. 50% of returns dropped). The pipeline should fail gracefully and the monitor should flag it.</p>
+
+<h2 id="s_test">10. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does point-in-time vintages matter for the data layer? What kind of bias does using revised data introduce?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Sketch a class-based pipeline with the seven layers. Each layer should be a method that takes the previous layer's output as input.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, conceptual</h3>
+  <p>If the monitoring layer detects rolling IC has fallen below 50% of historical, what should the response be?</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_27_regime.html">← Lesson 27</a></span>
+  <span><a href="lesson_29_capstone.html">Next: Lesson 29, Capstone →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+</script>
+</body>
+</html>

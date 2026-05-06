@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 23: Backtesting and CPCV</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 23: Backtesting and Combinatorial Purged CV</h1>
+<p class="subtitle">Module E, Week 6, Lesson 23. Every portfolio you build must survive a defensible out-of-sample test. Most published strategies fail this test.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Walk-forward backtesting</a></li>
+    <li><a href="#s2">Why standard k-fold leaks</a></li>
+    <li><a href="#s3">Purged k-fold cross-validation</a></li>
+    <li><a href="#s4">Combinatorial Purged CV (CPCV)</a></li>
+    <li><a href="#s5">Deflated Sharpe in production</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Split scheme</h3>
+<p>Walk-forward, k-fold, purged k-fold, CPCV. Each gives different out-of-sample Sharpe estimates with different reliability.</p>
+<h3>Embargo length</h3>
+<p>Days between train and test windows to prevent label leakage. Should be at least the prediction horizon plus the typical position holding period.</p>
+<h3>Number of trials $N_{\text{trials}}$</h3>
+<p>How many strategy variants you tested. Critical input to the deflated Sharpe ratio.</p>
+
+<h2 id="s1">1. Walk-forward backtesting</h2>
+<p>The honest approach. At each rebalancing date $t$, train on data up to $t - 1$. Predict for date $t$. Roll forward. Standard for time-series problems where ordering matters.</p>
+<p>Two flavours:</p>
+<ul>
+  <li><strong>Expanding window.</strong> Train on all data up to $t - 1$. More data, slower computation.</li>
+  <li><strong>Rolling window.</strong> Train on the last $W$ periods. Adapts to regime, less stable.</li>
+</ul>
+<p>Walk-forward gives you one out-of-sample path. The Sharpe of that path is a single noisy estimate, not a distribution.</p>
+
+<h2 id="s2">2. Why standard k-fold leaks</h2>
+<p>Standard cross-validation (random k-fold) shuffles observations, picks a fold for testing, trains on the rest. For IID data this is fine. <strong>For time series it leaks information</strong> in three ways:</p>
+<ol>
+  <li>Observations near the boundary (a test point near a training point in time) share latent state. Train uses information that "leaks" into test.</li>
+  <li>Multi-period predictions overlap. A model predicting 5-day forward returns at time $t$ has labels using data up to $t + 5$. If $t + 5$ is in the training set, leakage is direct.</li>
+  <li>Cross-asset exposures. Predicting asset 1 from asset 2 in the same period (where asset 2 is in test) leaks.</li>
+</ol>
+<p>The result: standard k-fold gives unrealistically high Sharpe estimates. The model is using the future to predict the past, indirectly.</p>
+
+<h2 id="s3">3. Purged k-fold</h2>
+<p>Lopez de Prado (2018) fixes leakage with two simple modifications:</p>
+<ul>
+  <li><strong>Purging.</strong> When a fold is used as test, remove all training samples whose labels overlap with test samples in time.</li>
+  <li><strong>Embargoing.</strong> Add a buffer of $h$ days after the test window before the next training observation begins.</li>
+</ul>
+<p>Effective embargo: prediction horizon plus a safety buffer. For weekly forecasts with monthly holding period, embargo around 1 month.</p>
+
+<h2 id="s4">4. Combinatorial Purged CV (CPCV)</h2>
+<p>Walk-forward gives 1 path. Purged k-fold gives $k$ paths (often correlated). CPCV gives many.</p>
+<p>The setup: split the data into $N$ groups. Choose $k$ of them as "test", $N - k$ as "train". Repeat for all $\binom{N}{k}$ combinations. Apply purging and embargoes. Concatenate the $k$ test sub-paths in chronological order to form a "backtest path".</p>
+<p>Total paths: $\binom{N}{k} \cdot \binom{N - k}{k - 1} / k$ (combinatorial counting). For $N = 6, k = 2$: 15 paths. For $N = 12, k = 3$: 220 paths. That gives a distribution of Sharpe estimates for one strategy on one dataset.</p>
+
+<h3>Live: backtest auditor</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>True Sharpe of strategy: <span class="value" id="tsr_v">0.5</span></label>
+      <input type="range" id="tsr" min="0" max="2" step="0.05" value="0.5">
+    </div>
+    <div class="control">
+      <label>Number of trials searched: <span class="value" id="N_v">100</span></label>
+      <input type="range" id="N" min="1" max="10000" step="50" value="100">
+    </div>
+    <div class="control">
+      <label>Sample size $T$ (months): <span class="value" id="T_v">120</span></label>
+      <input type="range" id="T" min="36" max="500" step="12" value="120">
+    </div>
+  </div>
+  <div id="bt_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Walk-forward Sharpe (1 path)</span><span class="stat-value" id="wf">0</span></div>
+    <div class="stat"><span>CPCV mean Sharpe</span><span class="stat-value" id="cpcv">0</span></div>
+    <div class="stat"><span>CPCV 5th percentile</span><span class="stat-value" id="p5">0</span></div>
+    <div class="stat"><span>Deflated Sharpe</span><span class="stat-value" id="dsr">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Set true Sharpe to 0 (random strategy) and trials to 1000.</strong> The walk-forward might still show Sharpe ~0.7 by luck. The CPCV distribution centres near zero with spread. The Deflated Sharpe rejects: this is noise dressed up as signal.
+</div>
+
+<h2 id="s5">5. Deflated Sharpe in production</h2>
+<p>Recap from Lesson 8: $\text{DSR} = \text{PSR}(\mathbb{E}[\max \hat{SR} | \text{null}])$. For $N$ trials and sample size $T$, the bias under the null is approximately $\sqrt{2 \log N / T}$.</p>
+<p>Production recipe:</p>
+<ol>
+  <li>Compute walk-forward Sharpe.</li>
+  <li>Compute CPCV Sharpe distribution.</li>
+  <li>Apply Deflated Sharpe with the right $N$ (count every variant tested).</li>
+  <li>Reject if DSR &lt; 0.95. The bar should be high.</li>
+</ol>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 50, 204):</strong> Article 50 ("Evaluating macro signals in three steps") gives the MS protocol: predictive correlation, accuracy, naive PnL. Article 204 ("Systematic trading strategies fooled by live records") quantifies the gap between in-sample and live performance: 30 to 50% Sharpe degradation is typical. CPCV and DSR are the formal tools for setting expectations honestly. MS uses CPCV-style validation in their published research and reports both in-sample and out-of-sample Sharpe.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 The CPCV path count</h3>
+<p>For $N$ groups and test size $k$: number of test combinations is $\binom{N}{k}$. Each combination, when arranged chronologically, contributes $k$ contiguous test segments. Total backtest paths formed from concatenating segments: $\binom{N}{k} \cdot k / N$.</p>
+<h3>6.2 Purging math</h3>
+<p>Let $h$ be the prediction horizon. A training point $X_t$ overlaps with test point $X_s$ if $|t - s| \le h$. Purge all such training points.</p>
+<h3>6.3 White's Reality Check (multiple testing)</h3>
+<p>White (2000) proposes a stationary bootstrap test: under the null that all $N$ strategies have zero Sharpe, what is the probability of seeing the observed best Sharpe? Computed by bootstrapping the data and re-evaluating max Sharpe across strategies. Hansen (2005) refines.</p>
+<h3>6.4 Family-wise vs false discovery rate</h3>
+<p>Bonferroni: divide significance level by $N$. Conservative.</p>
+<p>Benjamini-Hochberg: control false discovery rate. Accept some false positives but fewer than under no correction.</p>
+<p>For trading strategies, FWER (Bonferroni) is appropriate because a single false positive gets capital allocated.</p>
+<h3>6.5 Bootstrap confidence interval for Sharpe</h3>
+<p>Block bootstrap to preserve serial dependence. Resample blocks of length $L \approx \sqrt[3]{T}$, recompute Sharpe, take 2.5% and 97.5% quantiles.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Walk-forward backtest</h3>
+<pre><code>def walk_forward(strategy, returns, train_window=60, refit_every=12):
+    out = []
+    for t in range(train_window, len(returns), refit_every):
+        train = returns.iloc[t - train_window:t]
+        test_end = min(t + refit_every, len(returns))
+        model = strategy.fit(train)
+        out.extend(strategy.predict(returns.iloc[t:test_end]))
+    return out</code></pre>
+
+<h3>Exercise B: Purged k-fold</h3>
+<pre><code>def purged_kfold(n, k=5, embargo=22, label_horizon=22):
+    fold_size = n // k
+    for i in range(k):
+        test_start = i * fold_size
+        test_end = test_start + fold_size
+        purge_start = max(0, test_start - label_horizon)
+        purge_end = min(n, test_end + label_horizon + embargo)
+        train_idx = np.concatenate([np.arange(0, purge_start), np.arange(purge_end, n)])
+        test_idx = np.arange(test_start, test_end)
+        yield train_idx, test_idx</code></pre>
+
+<h3>Exercise C: CPCV with mlfinlab</h3>
+<pre><code>from mlfinlab.cross_validation import CombPurgedKFoldCV
+cv = CombPurgedKFoldCV(n_splits=6, n_test_splits=2, embargo_pct=0.01)</code></pre>
+
+<h3>Exercise D: Bootstrap Sharpe CI</h3>
+<pre><code>def bootstrap_sharpe(returns, n_boot=10000, block_size=22):
+    n = len(returns)
+    srs = []
+    for _ in range(n_boot):
+        starts = np.random.randint(0, n - block_size, size=n // block_size)
+        sample = np.concatenate([returns[s:s+block_size] for s in starts])
+        srs.append(sample.mean() / sample.std() * np.sqrt(252))
+    return np.percentile(srs, [2.5, 50, 97.5])</code></pre>
+
+<h3>Exercise E: Generate noise strategies, compute DSR</h3>
+<p>Generate 1000 random strategies on the same data. Compute the max Sharpe. Apply DSR. Confirm rejection.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does standard k-fold leak information for time series, and which two modifications fix it?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Implement a 6-fold, 2-test-fold CPCV on synthetic data. Compute the Sharpe distribution from the resulting paths.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For 1000 trials and $T = 120$ monthly observations, what is the expected max Sharpe under the null?</p>
+  <p><em>Answer:</em> Approximately $\sqrt{2 \log 1000 / 120} \approx 0.34$.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_22_kelly.html">← Lesson 22</a></span>
+  <span><a href="lesson_24_factor_models.html">Next: Lesson 24, Factor models →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function update23() {
+  const tsr = parseFloat(document.getElementById('tsr').value);
+  const N = parseInt(document.getElementById('N').value);
+  const T = parseInt(document.getElementById('T').value);
+  document.getElementById('tsr_v').textContent = tsr.toFixed(2);
+  document.getElementById('N_v').textContent = N;
+  document.getElementById('T_v').textContent = T;
+
+  // Simulate one walk-forward
+  const rng = mulberry32(42);
+  const n = T;
+  const ret = new Array(n);
+  for (let i = 0; i < n; i++) ret[i] = tsr / Math.sqrt(12) + randn(rng) / Math.sqrt(12);
+  // WF Sharpe: just the full sample SR
+  let m = 0; for (const r of ret) m += r / n;
+  let v = 0; for (const r of ret) v += (r - m) * (r - m) / n;
+  const wfSR = m / Math.sqrt(v) * Math.sqrt(12);
+
+  // CPCV: simulate 50 paths by bootstrapping subsets
+  const cpcvSRs = [];
+  for (let p = 0; p < 100; p++) {
+    const rngP = mulberry32(p + 1);
+    let mm = 0, vv = 0;
+    const idx = [];
+    for (let j = 0; j < Math.floor(0.4 * n); j++) idx.push(Math.floor(rngP() * n));
+    for (const i of idx) mm += ret[i];
+    mm /= idx.length;
+    for (const i of idx) vv += (ret[i] - mm) ** 2;
+    vv /= idx.length;
+    cpcvSRs.push(mm / Math.sqrt(vv) * Math.sqrt(12));
+  }
+  cpcvSRs.sort((a, b) => a - b);
+  const cpcvMean = cpcvSRs.reduce((a, b) => a + b, 0) / cpcvSRs.length;
+  const p5 = cpcvSRs[Math.floor(cpcvSRs.length * 0.05)];
+
+  // DSR: expected max under null
+  const z1 = -1 + Math.sqrt(2 * Math.log(N));
+  const expMaxSR = z1 / Math.sqrt(T);
+  // PSR vs that benchmark
+  const sePsr = Math.sqrt((1 + 0.5 * wfSR ** 2) / (T - 1));
+  const dsrZ = (wfSR - expMaxSR) / sePsr;
+  // Approx normal CDF
+  function ncdf(z) {
+    const t = 1 / (1 + 0.2316419 * Math.abs(z));
+    const d = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+    let p = d * (0.319381530 * t - 0.356563782 * t**2 + 1.781477937 * t**3 - 1.821255978 * t**4 + 1.330274429 * t**5);
+    return z >= 0 ? 1 - p : p;
+  }
+  const dsr = ncdf(dsrZ);
+
+  document.getElementById('wf').textContent = wfSR.toFixed(2);
+  document.getElementById('cpcv').textContent = cpcvMean.toFixed(2);
+  document.getElementById('p5').textContent = p5.toFixed(2);
+  document.getElementById('dsr').textContent = (dsr * 100).toFixed(1) + '%';
+
+  Plotly.react('bt_plot', [
+    { x: cpcvSRs, type: 'histogram', nbinsx: 25, marker: { color: '#2b6cb0' }, name: 'CPCV Sharpes', opacity: 0.7 },
+    { x: [tsr, tsr], y: [0, 20], mode: 'lines', line: { color: '#22543d', width: 2.5, dash: 'dash' }, name: 'True SR' },
+    { x: [wfSR, wfSR], y: [0, 20], mode: 'lines', line: { color: '#c53030', width: 2.5 }, name: 'Walk-forward SR' },
+    { x: [expMaxSR, expMaxSR], y: [0, 20], mode: 'lines', line: { color: '#dd6b20', width: 2 }, name: 'Expected max under null' }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Sharpe ratio' },
+    yaxis: { title: 'Frequency' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['tsr', 'N', 'T'].forEach(id => document.getElementById(id).addEventListener('input', update23));
+update23();
+</script>
+</body>
+</html>

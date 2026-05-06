@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 26: Signal Blending and Grinold's Law</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 26: Signal Blending and Grinold's Law</h1>
+<p class="subtitle">Module F, Week 7, Lesson 26. Most desks have many signals and one risk model. Blending signals well is a portfolio construction problem in its own right. The heart of Macrosynergy practice.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The blending problem</a></li>
+    <li><a href="#s2">Equal-weight blending</a></li>
+    <li><a href="#s3">IC-weighted blending</a></li>
+    <li><a href="#s4">Orthogonalisation</a></li>
+    <li><a href="#s5">Grinold's law and breadth</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Number of signals</h3>
+<p>2 to 6 signals stacked. Macrosynergy strategies often use 4 to 8 macro themes per asset.</p>
+<h3>Average signal IC</h3>
+<p>The mean information coefficient across signals. Macro signals typically run 0.04 to 0.12.</p>
+<h3>Signal correlation</h3>
+<p>Average pairwise correlation among signals. High correlation hurts diversification benefits.</p>
+
+<h2 id="s1">1. The blending problem</h2>
+<p>You have $K$ signals $s_1, \ldots, s_K$, each predicting future returns with its own IC. Build a composite $s = \sum_k w_k s_k$ that maximises predictive power.</p>
+<p>Three approaches in increasing sophistication:</p>
+<ol>
+  <li>Equal weight: $w_k = 1/K$.</li>
+  <li>IC weight: $w_k \propto \text{IC}_k$.</li>
+  <li>Optimal weight (Grinold-Kahn): $w \propto \Sigma_s^{-1} \text{IC}$, where $\Sigma_s$ is signal covariance.</li>
+</ol>
+
+<h2 id="s2">2. Equal-weight blending</h2>
+<p>The Macrosynergy default. Take all signals, z-score within date, average. No optimisation.</p>
+<p>Pros: zero overfitting risk. Robust to estimation error in IC. Easy to explain.</p>
+<p>Cons: gives identical weight to a great signal and a marginal one. Misses correlation.</p>
+<p>Empirically, equal weight is hard to beat by much because the upside of "smart" weighting is small and the downside (estimation error) is large.</p>
+
+<h2 id="s3">3. IC-weighted blending</h2>
+<p>Set $w_k$ proportional to historical IC. Higher-IC signals get more weight.</p>
+<p>Issues:</p>
+<ul>
+  <li>Historical IC is a noisy estimate of future IC.</li>
+  <li>Selection bias: signals with high in-sample IC are partly lucky.</li>
+  <li>If you also chose the signal set based on IC, double-counting.</li>
+</ul>
+<p>In practice, IC-weighting helps modestly when the IC differences are large and statistically significant. For most macro signal sets, equal weight is within 5% of IC-weighted out of sample.</p>
+
+<h2 id="s4">4. Orthogonalisation</h2>
+<p>Two correlated signals carry overlapping information. Combining them naively double-counts.</p>
+<p>Gram-Schmidt: project signal 2 onto the space orthogonal to signal 1.</p>
+<div class="formula">$$s_2^{\text{orth}} = s_2 - \frac{\langle s_1, s_2 \rangle}{\langle s_1, s_1 \rangle} s_1$$</div>
+<p>The orthogonalised signal carries only the information not in signal 1. Combining signal 1 + orthogonalised signal 2 has no double counting.</p>
+<p>Repeat for $s_3$ orthogonal to span of $\{s_1, s_2\}$, etc. Result: an orthonormal basis for the signal space.</p>
+
+<h2 id="s5">5. Grinold's law and breadth</h2>
+<p>The fundamental law of active management:</p>
+<div class="formula">$$\text{IR} \approx \text{IC} \cdot \sqrt{\text{breadth}}$$</div>
+<p>where breadth is the number of independent bets per year. For $K$ signals on $N$ assets at frequency $f$ per year, breadth is at most $K \cdot N \cdot f$.</p>
+<p>Critical: <strong>independent</strong> bets. Correlated signals reduce effective breadth. The "diversified breadth" rather than the "nominal breadth".</p>
+
+<h3>Live: signal stack composer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Number of signals: <span class="value" id="K_v">4</span></label>
+      <input type="range" id="K" min="2" max="6" step="1" value="4">
+    </div>
+    <div class="control">
+      <label>Average IC: <span class="value" id="ic_v">0.08</span></label>
+      <input type="range" id="ic" min="0.02" max="0.20" step="0.01" value="0.08">
+    </div>
+    <div class="control">
+      <label>Signal correlation: <span class="value" id="rho_v">0.30</span></label>
+      <input type="range" id="rho" min="0" max="0.9" step="0.05" value="0.30">
+    </div>
+    <div class="control">
+      <label>Asset breadth $N$: <span class="value" id="N_v">20</span></label>
+      <input type="range" id="N" min="5" max="100" step="5" value="20">
+    </div>
+  </div>
+  <div id="blend_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Equal-weight composite IC</span><span class="stat-value" id="ic_eq">0</span></div>
+    <div class="stat"><span>Composite IR (Grinold)</span><span class="stat-value" id="ir_g">0</span></div>
+    <div class="stat"><span>Effective N (orthogonalised)</span><span class="stat-value" id="eff_n">0</span></div>
+    <div class="stat"><span>Diversified breadth</span><span class="stat-value" id="div_b">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Crank signal correlation from 0 to 0.9.</strong> Composite IC barely changes (slight decrease). But effective N falls dramatically: 4 highly-correlated signals act like 1 signal. Diversified breadth collapses. The IR you can actually achieve is much smaller than nominal breadth would suggest.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 28, 36, 39, 50, 25, 49):</strong> The MS approach. Article 28 covers basic statistical learning for signal optimisation. Article 36 uses random forests. Article 39 documents the open-source Python pipeline. Article 50 is the three-step signal evaluation protocol. Article 25 boosts signals; article 49 uses beta learning for time-varying signal weights. The conceptual parity philosophy: equal-weight signals within a theme, equal-weight themes, equal-weight assets. The MS flagship strategy (art 3) blends 5+ macro themes across 50+ instruments and beats most ML-blended versions out of sample. Simpler is robust.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Composite IC for $K$ correlated signals</h3>
+<p>For equal-weight composite of $K$ signals each with IC $\rho_k$ and pairwise correlation $\rho$ (assume identical for simplicity):</p>
+<div class="formula">$$\text{IC}_{\text{composite}} = \frac{\bar \rho \sqrt{K}}{\sqrt{1 + (K - 1) \rho}}$$</div>
+<p>For $\rho = 0$: $\text{IC}_{\text{composite}} = \bar \rho \sqrt{K}$. For $\rho = 1$: $\text{IC}_{\text{composite}} = \bar \rho$. Composite IC scales with sqrt(K) only when signals are uncorrelated.</p>
+<h3>6.2 Optimal blend weights (Grinold-Kahn)</h3>
+<div class="formula">$$w^\star = \Sigma_s^{-1} \mathbf{IC}$$</div>
+<p>where $\Sigma_s$ is the signal covariance and $\mathbf{IC}$ is the IC vector. Closed form. In practice estimation noise in $\Sigma_s$ ruins this; equal weight wins out-of-sample.</p>
+<h3>6.3 Effective N from signal correlation matrix</h3>
+<p>The eigenvalue spectrum of the signal correlation matrix tells you effective dimension. If $\lambda_1, \ldots, \lambda_K$ are eigenvalues:</p>
+<div class="formula">$$N_{\text{eff}} = \frac{(\sum \lambda_k)^2}{\sum \lambda_k^2}$$</div>
+<p>Identity matrix: $N_{\text{eff}} = K$. Single dominant factor: $N_{\text{eff}} \to 1$.</p>
+<h3>6.4 The transfer coefficient</h3>
+<p>Signal IC translates to portfolio alpha through the transfer coefficient TC, which captures how cleanly the alpha translates given constraints (Lesson 25).</p>
+<div class="formula">$$\text{IR} = \text{IC} \cdot \sqrt{\text{breadth}} \cdot \text{TC}$$</div>
+<p>Long-only TC ~0.5; market-neutral hedge fund TC ~0.85. Constraints cost.</p>
+<h3>6.5 Time-varying signal weights</h3>
+<p>Beta learning (art 49, Lesson 10): allow $w_k(t)$ to vary slowly. Use rolling regression of forward returns on signals. Smooth via shrinkage. Modest gains over static equal weight.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Equal-weight blend</h3>
+<pre><code>def equal_weight_blend(signals_dict):
+    df = pd.concat(signals_dict, axis=1)
+    df_z = df.sub(df.mean(axis=1), axis=0).div(df.std(axis=1), axis=0)
+    return df_z.mean(axis=1)</code></pre>
+
+<h3>Exercise B: IC-weighted blend</h3>
+<p>Compute rolling IC for each signal. Weight by IC. Renormalise.</p>
+
+<h3>Exercise C: Orthogonalisation</h3>
+<pre><code>def gram_schmidt(signals):
+    out = [signals[:, 0]]
+    for k in range(1, signals.shape[1]):
+        s = signals[:, k]
+        for prev in out:
+            s = s - (prev @ s / (prev @ prev)) * prev
+        out.append(s)
+    return np.array(out).T</code></pre>
+
+<h3>Exercise D: Compute Grinold's law breadth</h3>
+<p>Given a set of signal returns, compute effective N from the eigenvalue spectrum. Compare to nominal K.</p>
+
+<h3>Exercise E: Backtest 4 signals on FX</h3>
+<p>Carry, value, trend, growth. Equal weight, IC weight, orthogonalise. Report IR for each.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does equal-weight blending beat IC-weighted out of sample most of the time?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise C to also normalise each orthogonalised signal to unit variance.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For 5 signals with average pairwise correlation 0.5, what is effective N? Use the eigenvalue formula.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_25_constraints_te.html">← Lesson 25</a></span>
+  <span><a href="lesson_27_regime.html">Next: Lesson 27, Regime →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function update26() {
+  const K = parseInt(document.getElementById('K').value);
+  const ic = parseFloat(document.getElementById('ic').value);
+  const rho = parseFloat(document.getElementById('rho').value);
+  const N = parseInt(document.getElementById('N').value);
+  document.getElementById('K_v').textContent = K;
+  document.getElementById('ic_v').textContent = ic.toFixed(2);
+  document.getElementById('rho_v').textContent = rho.toFixed(2);
+  document.getElementById('N_v').textContent = N;
+
+  // Composite IC formula
+  const compositeIC = ic * Math.sqrt(K) / Math.sqrt(1 + (K - 1) * rho);
+  // Effective N from eigenvalues of compound symmetric matrix
+  // Eigenvalues are: 1 + (K-1)*rho (1 of these) and 1 - rho (K-1 of these)
+  const e1 = 1 + (K - 1) * rho;
+  const eRest = 1 - rho;
+  const sum1 = e1 + (K - 1) * eRest;
+  const sum2 = e1 * e1 + (K - 1) * eRest * eRest;
+  const effN = (sum1 * sum1) / sum2;
+  // Diversified breadth = effN * N
+  const divB = effN * N;
+  // Composite IR
+  const ir = compositeIC * Math.sqrt(divB);
+
+  document.getElementById('ic_eq').textContent = compositeIC.toFixed(3);
+  document.getElementById('ir_g').textContent = ir.toFixed(2);
+  document.getElementById('eff_n').textContent = effN.toFixed(2);
+  document.getElementById('div_b').textContent = divB.toFixed(0);
+
+  // Plot composite IC and IR vs correlation
+  const rhoGrid = [];
+  for (let r = 0; r <= 0.95; r += 0.02) rhoGrid.push(r);
+  const ics = rhoGrid.map(r => ic * Math.sqrt(K) / Math.sqrt(1 + (K - 1) * r));
+  const irs = rhoGrid.map(r => {
+    const e1_ = 1 + (K - 1) * r;
+    const eR = 1 - r;
+    const s1 = e1_ + (K - 1) * eR;
+    const s2 = e1_ * e1_ + (K - 1) * eR * eR;
+    const en = (s1 * s1) / s2;
+    return ic * Math.sqrt(K) / Math.sqrt(1 + (K - 1) * r) * Math.sqrt(en * N);
+  });
+
+  Plotly.react('blend_plot', [
+    { x: rhoGrid, y: ics, mode: 'lines', name: 'Composite IC', line: { color: '#2b6cb0', width: 2 }, yaxis: 'y' },
+    { x: rhoGrid, y: irs, mode: 'lines', name: 'Composite IR', line: { color: '#c05621', width: 2 }, yaxis: 'y2' },
+    { x: [rho], y: [compositeIC], mode: 'markers', marker: { size: 12, color: '#2b6cb0' }, name: 'Current IC', yaxis: 'y' },
+    { x: [rho], y: [ir], mode: 'markers', marker: { size: 12, color: '#c05621', symbol: 'star' }, name: 'Current IR', yaxis: 'y2' }
+  ], {
+    margin: { l: 60, r: 60, t: 30, b: 50 },
+    xaxis: { title: 'Average signal correlation $\\rho$' },
+    yaxis: { title: 'Composite IC', side: 'left' },
+    yaxis2: { title: 'Composite IR', overlaying: 'y', side: 'right' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['K', 'ic', 'rho', 'N'].forEach(id => document.getElementById(id).addEventListener('input', update26));
+update26();
+</script>
+</body>
+</html>

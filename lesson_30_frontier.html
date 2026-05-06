@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 30: Frontier Topics</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+  .topic { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.2rem 1.5rem; margin: 1rem 0; }
+  .topic h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 30: Frontier Topics</h1>
+<p class="subtitle">Module G, Week 8, Lesson 30. The boundary of current research. Reinforcement learning, online learning, differentiable optimisation, causal inference, ESG. Where the field is heading.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s1">Reinforcement learning</a></li>
+    <li><a href="#s2">Online portfolio selection</a></li>
+    <li><a href="#s3">Differentiable optimisation</a></li>
+    <li><a href="#s4">Causal inference for portfolios</a></li>
+    <li><a href="#s5">ESG and net-zero</a></li>
+    <li><a href="#s6">Quantum-inspired optimisation</a></li>
+    <li><a href="#s7">LLMs in macro signal generation</a></li>
+    <li><a href="#s8">What to read next</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s1">1. Reinforcement learning</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Replace the explicit pipeline (signal → forecast → optimisation → risk) with a learned policy that maps state directly to action. The agent learns from simulated trajectories how to maximise long-run reward (e.g. risk-adjusted return).</p>
+  <h3>The reality</h3>
+  <p>Promising in toy environments. Fragile in real markets because of non-stationarity and limited data. Best results so far: trading-cost optimisation (where the environment is stable) and execution scheduling (Almgren-Chriss style). Macrosynergy art 186 explores actor-critic methods for trading systems with mixed results: gains over single-period optimisation in low-cost regimes, deteriorates with realistic costs.</p>
+  <h3>The frontier</h3>
+  <p>Model-based RL with explicit reward shaping. Imitation learning from human traders. Multi-agent RL for crowded-trade analysis.</p>
+</div>
+
+<h2 id="s2">2. Online portfolio selection</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Cover (1991) shows that without any distributional assumptions, you can construct a portfolio that asymptotically matches the best constant-rebalanced portfolio in hindsight. This is the "universal portfolio". Recent work uses online learning algorithms (FTRL, mirror descent) for similar guarantees with regret bounds.</p>
+  <h3>The reality</h3>
+  <p>Theoretical regret guarantees, but the rates are slow. For practical horizons, fixed-strategy portfolios often outperform. Useful as a benchmark and as a robustness check.</p>
+</div>
+
+<h2 id="s3">3. Differentiable optimisation</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Wrap the optimisation layer (Markowitz, ERC, etc.) in a differentiable computation graph. Train end-to-end: signals, forecasts, optimisation parameters all jointly optimised on out-of-sample Sharpe.</p>
+  <h3>The reality</h3>
+  <p>Amos and Kolter (2017) show how to differentiate through QPs. Recent libraries (cvxpylayers) make it practical. Potential: train signals jointly with the optimisation that consumes them. Risk: overfitting, since you're now optimising more parameters end-to-end.</p>
+  <h3>The frontier</h3>
+  <p>Bilevel optimisation for hyperparameters. Differentiable risk metrics (CVaR, drawdown).</p>
+</div>
+
+<h2 id="s4">4. Causal inference for portfolios</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Not all correlations are predictive. A signal that correlates with returns might be picking up a confounder rather than a true cause. Causal inference (DAGs, instrumental variables, synthetic controls) tries to isolate causal effects from correlations.</p>
+  <h3>The reality</h3>
+  <p>Promising for understanding why a signal works. Less useful for direct trading because we rarely have valid instruments in markets. Hot topic in academic finance.</p>
+  <h3>Where it lands</h3>
+  <p>Regime classification (Lesson 27): which macro variables actually drive regime shifts vs which are correlated symptoms. Signal robustness analysis: which signals survive in regimes their correlation didn't see.</p>
+</div>
+
+<h2 id="s5">5. ESG and net-zero</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Climate-aware portfolios that target carbon-intensity reductions while preserving returns. Net-zero alignment with the Paris Agreement targets a 7%/year reduction in portfolio carbon intensity.</p>
+  <h3>The reality</h3>
+  <p>Constraint-based approaches (Lesson 25) work today. Hard problem: distinguishing greenwashing from real carbon reductions in equities. Active research on transition pathways and dynamic ESG scoring.</p>
+  <h3>Frontier</h3>
+  <p>Scope-3 emissions (supply chain). Climate-stress scenarios for VaR. Just-transition metrics.</p>
+</div>
+
+<h2 id="s6">6. Quantum-inspired optimisation</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Combinatorial portfolio problems (cardinality constraints: pick exactly K of N assets) are NP-hard for classical solvers. Quantum annealers and quantum-inspired classical algorithms (simulated annealing, parallel tempering) attack them.</p>
+  <h3>The reality</h3>
+  <p>Real quantum hardware is still too small for production-scale portfolios. Quantum-inspired classical approaches are competitive with mixed-integer solvers (Gurobi, CPLEX) on medium-sized problems. Niche but interesting.</p>
+</div>
+
+<h2 id="s7">7. LLMs in macro signal generation</h2>
+
+<div class="topic">
+  <h3>The proposition</h3>
+  <p>Use large language models to extract signals from text: central bank communications, earnings transcripts, news flow. Sentiment indices, topic embeddings, structured information extraction.</p>
+  <h3>The reality</h3>
+  <p>Sentiment indices from LLMs have non-trivial IC on equity returns. Central bank communication analysis is the most active area. Macrosynergy uses LLM-based features as one input among many in the signal stack. Risk: LLM outputs are not point-in-time without careful timestamping.</p>
+  <h3>Frontier</h3>
+  <p>Real-time event extraction. Multi-modal models (text + numbers). Agent frameworks where LLMs run their own backtest analysis.</p>
+</div>
+
+<h2 id="s8">8. What to read next</h2>
+<p>For each frontier topic, the seminal paper plus a recent review:</p>
+<ul>
+  <li><strong>RL for trading:</strong> Moody and Saffell (2001); Jiang et al. (2017); MS art 186 (2024).</li>
+  <li><strong>Online portfolio selection:</strong> Cover (1991); Hazan et al. (2020) review.</li>
+  <li><strong>Differentiable optimisation:</strong> Amos and Kolter (2017); Agrawal et al. (2019) cvxpylayers.</li>
+  <li><strong>Causal inference for finance:</strong> Imbens and Rubin (2015); Lopez de Prado (2024) on causal factor investing.</li>
+  <li><strong>ESG portfolios:</strong> Bolton and Kacperczyk (2021); Pastor et al. (2022).</li>
+  <li><strong>Quantum optimisation:</strong> Mugel et al. (2022) review.</li>
+  <li><strong>LLMs in finance:</strong> Lopez-Lira and Tang (2023); ongoing.</li>
+</ul>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 186, 121, plus ongoing research):</strong> Macrosynergy keeps a watchful eye on RL, ML, and causal methods but adopts them slowly. The MS philosophy: every frontier method must beat the equal-weight conceptual-parity baseline out of sample by a margin that justifies its added complexity and operational risk. Most don't. The handful that do (regression-based ML for noisy macro signals, ensemble methods for non-linear interactions) are integrated carefully with full backtesting hygiene.
+</div>
+
+<h2 id="s_test">9. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Pick one frontier topic. Outline three reasons it might fail to beat the equal-weight baseline out of sample.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, research</h3>
+  <p>Read one paper from the "What to read next" list. Write a one-page critique focusing on whether the claimed Sharpe gain is robust to the kind of out-of-sample test we built in Lesson 23.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, project</h3>
+  <p>Pick a frontier method. Implement it on the capstone universe (Lesson 29). Compare to the conceptual-parity capstone. Report Sharpe difference, after CPCV and deflated Sharpe adjustment.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_29_capstone.html">← Lesson 29</a></span>
+  <span><a href="index.html">Curriculum complete. Back to home.</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+</script>
+</body>
+</html>
