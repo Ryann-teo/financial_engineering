@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 10: Shrinkage and Bayesian Estimation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 10: Shrinkage and Bayesian Estimation</h1>
+<p class="subtitle">Module C, Week 3, Lesson 10. Shrink your noisy estimates toward a structured prior. Tiny estimation reduction, large portfolio improvement.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">James-Stein shrinkage of the mean</a></li>
+    <li><a href="#s2">Ledoit-Wolf shrinkage of the covariance</a></li>
+    <li><a href="#s3">Choice of target</a></li>
+    <li><a href="#s4">Bayesian portfolio choice</a></li>
+    <li><a href="#s5">Connection to ridge regression</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Shrinkage intensity $\delta$</h3>
+<p>The blend between sample and target. $\delta = 0$ uses the sample only (zero shrinkage). $\delta = 1$ uses the target only (full shrinkage). Optimal $\delta^\star$ depends on $T$, $N$, and how close the target is to truth.</p>
+<h3>Sample size $T$</h3>
+<p>The slider drives how noisy your sample is. Small $T$ implies noisy sample, so optimal $\delta^\star$ rises toward the target.</p>
+<h3>Target type</h3>
+<p>Three common targets: identity (assumes uncorrelated assets), constant correlation (assumes pairwise correlations are all equal), single factor (assumes one market beta plus residual). Each is a parsimonious model that the data shrinks toward.</p>
+
+<h2 id="s1">1. James-Stein shrinkage of the mean</h2>
+<p>James and Stein (1961) proved that for $N \ge 3$, the sample mean $\bar X$ is dominated by</p>
+<div class="formula">$$\hat \mu^{JS} = \bar \mu + (1 - \phi)(\bar X - \bar \mu \cdot \mathbf{1})$$</div>
+<p>where $\bar \mu$ is the grand mean (or any fixed target) and $\phi$ is the shrinkage intensity. The James-Stein estimator has uniformly lower expected squared error than the sample mean. The result was a shock at the time: the sample mean is the maximum likelihood estimator, yet a biased estimator beats it.</p>
+
+<p>For portfolio purposes, this means we should not trust the sample mean of returns. Pull each asset's mean toward the cross-sectional grand mean, by an amount that depends on how noisy your data is.</p>
+
+<h2 id="s2">2. Ledoit-Wolf shrinkage of $\Sigma$</h2>
+<p>Ledoit and Wolf (2004) extended the same idea to covariance matrices:</p>
+<div class="formula">$$\hat \Sigma^{LW} = (1 - \delta) S + \delta F$$</div>
+<p>where $S$ is the sample covariance and $F$ is a structured target. The optimal $\delta^\star$ minimises the expected Frobenius distance to the true $\Sigma$:</p>
+<div class="formula">$$\delta^\star = \frac{\sum_{i, j} \text{Var}(s_{ij}) - \text{Cov}(s_{ij}, f_{ij})}{\sum_{i, j} (s_{ij} - f_{ij})^2}$$</div>
+<p>The numerator is the "noise" we are trying to remove. The denominator is the "bias" we accept by shrinking. The closed form depends only on data moments, no cross-validation needed.</p>
+
+<h2 id="s3">3. Choice of target</h2>
+<p>Three popular targets:</p>
+<ul>
+  <li><strong>Identity, $F = \sigma^2 I$.</strong> Assumes uncorrelated assets with common variance. Most aggressive shrinkage. Best when $T \ll N$.</li>
+  <li><strong>Constant correlation, $F_{ij} = \bar \rho \cdot \sigma_i \sigma_j$.</strong> Assumes all pairwise correlations are equal to the average. Preserves the diagonal of variances; smooths the off-diagonal. The Ledoit-Wolf default for finance.</li>
+  <li><strong>Single-factor, $F = \beta \beta^\top \sigma_m^2 + D$.</strong> Assumes a single common factor. Strong when there is a clear market factor (equity universes).</li>
+</ul>
+
+<h3>Live: shrinkage tuner</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Sample size $T$ (months): <span class="value" id="T_v">60</span></label>
+      <input type="range" id="T" min="20" max="500" step="10" value="60">
+    </div>
+    <div class="control">
+      <label>Shrinkage $\delta$: <span class="value" id="delta_v">0.50</span></label>
+      <input type="range" id="delta" min="0" max="1" step="0.05" value="0.50">
+    </div>
+    <div class="control">
+      <label>Target: <span class="value" id="target_v">constant correlation</span></label>
+      <input type="range" id="target" min="0" max="2" step="1" value="1">
+    </div>
+  </div>
+  <div id="shrinkage_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Sample $\kappa(\hat \Sigma)$</span><span class="stat-value" id="kappa_sample">0</span></div>
+    <div class="stat"><span>Shrunk $\kappa(\hat \Sigma)$</span><span class="stat-value" id="kappa_shrunk">0</span></div>
+    <div class="stat"><span>Optimal LW $\delta^\star$</span><span class="stat-value" id="delta_star">0</span></div>
+    <div class="stat"><span>OOS variance (relative)</span><span class="stat-value" id="oos_var">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Push $T$ down to 30 months.</strong> The sample condition number explodes (yellow line in the plot rises). Slide $\delta$ up. The shrunk condition number stays bounded. Click the "auto" $\delta^\star$ implicit in the optimal LW formula. Out-of-sample variance falls by 20 to 50% in typical setups.
+</div>
+
+<h2 id="s4">4. Bayesian portfolio choice</h2>
+<p>The shrinkage estimator has a Bayesian interpretation. Treat $\mu$ and $\Sigma$ as random with a prior $\pi(\mu, \Sigma)$, observe $T$ returns, compute the posterior. Under a normal-inverse-Wishart prior, the posterior mean of $\Sigma$ is</p>
+<div class="formula">$$\mathbb{E}[\Sigma | r_{1:T}] = \frac{T - 1}{T - 1 + \nu} S + \frac{\nu}{T - 1 + \nu} F$$</div>
+<p>which is exactly Ledoit-Wolf shrinkage with $\delta = \nu / (T - 1 + \nu)$. The "prior strength" $\nu$ controls how much you weight the prior. James-Stein, Ledoit-Wolf, and Bayesian portfolio choice are three views of the same idea.</p>
+
+<h2 id="s5">5. Connection to ridge regression</h2>
+<p>Recall that the regression problem $y = X \beta + \epsilon$ has OLS solution $\hat \beta = (X^\top X)^{-1} X^\top y$. Ridge replaces this with $\hat \beta_{\text{ridge}} = (X^\top X + \lambda I)^{-1} X^\top y$. The added $\lambda I$ is exactly identity-target shrinkage on the design matrix's covariance. <strong>Shrinkage in $\Sigma$ and ridge in regression are the same operation.</strong> Tangency portfolio with shrunk $\Sigma$ equals ridge regression of returns on the budget vector.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 4, 25, 45):</strong> Macrosynergy's regression-based ML signal pipeline (article 4) uses ridge as the workhorse precisely because of its shrinkage interpretation. Article 25 boosts ridge regressors and gets to Sharpe 1.1 on FX trading across 29 currencies. Article 45 ("How to adjust regression-based trading signals for reliability") extends shrinkage to time-varying weights. The Macrosynergy default: ridge with cross-validated lambda, refit monthly. They never use OLS on macro data.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 Why James-Stein dominates the sample mean</h3>
+<p>Under squared-error loss and $N \ge 3$, $\hat \mu^{JS}$ has uniformly lower expected loss than $\bar X$ for every value of the true $\mu$. The proof uses Stein's lemma: the unbiased estimator of the expected loss is decreasing in the shrinkage intensity. Bias and variance trade off, and shrinkage wins for $N \ge 3$.</p>
+
+<h3>6.2 The Ledoit-Wolf optimal $\delta^\star$ in closed form</h3>
+<div class="formula">$$\delta^\star = \frac{\pi - \rho}{\gamma}$$</div>
+<p>where $\pi = \sum_{i,j} \pi_{ij}$ is the asymptotic variance of sample covariance entries, $\rho = \sum_{i,j} \rho_{ij}$ is the asymptotic covariance between sample $S$ and target $F$, and $\gamma = \sum_{i,j} (s_{ij} - f_{ij})^2$ is the squared distance. Each term has a closed-form sample estimate. Ledoit-Wolf 2004 gives the exact formulas.</p>
+
+<h3>6.3 Optimal nonlinear shrinkage (Ledoit-Wolf 2017)</h3>
+<p>Linear shrinkage applies the same intensity to every eigenvalue. Nonlinear shrinkage adjusts each eigenvalue separately, using random matrix theory to estimate the "true" eigenvalue distribution. Outperforms linear shrinkage for large $N/T$.</p>
+
+<h3>6.4 The bias-variance trade-off in shrinkage</h3>
+<p>Sample covariance is unbiased but high variance. Target $F$ is biased but zero variance. The MSE is</p>
+<div class="formula">$$\text{MSE}(\hat \Sigma) = (1 - \delta)^2 \text{Var}(S) + \delta^2 \|F - \Sigma\|^2$$</div>
+<p>Differentiate, set to zero: $\delta^\star = \text{Var}(S) / (\text{Var}(S) + \|F - \Sigma\|^2)$. When $T$ is small, $\text{Var}(S)$ is large, so $\delta^\star$ approaches 1. When $T$ is large, $\text{Var}(S)$ is small, so $\delta^\star$ approaches 0. The shrinkage intensity adapts to your data quality.</p>
+
+<h3>6.5 Why constant-correlation works for finance</h3>
+<p>The structure assumed by the constant-correlation target ($\rho_{ij} = \bar \rho$ for all $i \ne j$) is typically wrong, but it is wrong in a useful way. The diagonal (variances) is preserved. The off-diagonal (correlations) is smoothed. Empirically, the sample correlation matrix is much noisier than the sample variance, so smoothing correlations helps more than smoothing variances. Ledoit-Wolf (2004) shows this is the best linear target for finance data.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Ledoit-Wolf with sklearn</h3>
+<pre><code>from sklearn.covariance import LedoitWolf
+lw = LedoitWolf()
+lw.fit(returns)
+Sigma_shrunk = lw.covariance_
+delta = lw.shrinkage_</code></pre>
+
+<h3>Exercise B: Manual Ledoit-Wolf from scratch</h3>
+<p>Implement the constant-correlation target and the closed-form $\delta^\star$. Compare to sklearn's output.</p>
+
+<h3>Exercise C: Cross-validate $\delta$</h3>
+<p>Use 5-fold CV to find the $\delta$ that minimises out-of-sample portfolio variance. Compare to the LW closed form.</p>
+
+<h3>Exercise D: Ridge regression as shrinkage</h3>
+<p>Solve the tangency portfolio with shrunk $\Sigma$ for a sequence of $\delta$ values. Show that the resulting weights are equivalent to ridge regression coefficients with $\lambda$ inversely proportional to $1 - \delta$.</p>
+
+<h3>Exercise E: Out-of-sample horse race</h3>
+<p>On 24-month rolling windows, compare: sample $\Sigma$, identity-shrunk, constant-correlation-shrunk, single-factor-shrunk. Report OOS portfolio variance for the minimum-variance portfolio under each.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does shrinkage have higher bias but lower variance than the sample estimator? Use the constant-correlation target as your example.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise B to compute the LW $\delta^\star$ for both identity and constant-correlation targets. Compare. The optimal target depends on the universe.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For $T = 60$, $N = 50$, optimal $\delta^\star$ is typically between 0.3 and 0.5. Compute it on synthetic Gaussian data with true $\Sigma = I$. Report.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_09_why_mv_breaks.html">← Lesson 9</a></span>
+  <span><a href="lesson_11_black_litterman.html">Next: Lesson 11, Black-Litterman →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+      throwOnError: false
+    });
+  }
+});
+
+const N = 8;
+const true_sigma = [0.20, 0.10, 0.18, 0.12, 0.22, 0.08, 0.15, 0.25];
+const true_rho_avg = 0.3;
+
+function buildTrueSigma() {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) {
+      const rho = i === j ? 1 : (0.2 + 0.3 * Math.cos(i + j));
+      r.push(true_sigma[i] * true_sigma[j] * rho);
+    }
+    S.push(r);
+  }
+  return S;
+}
+const Sigma_true = buildTrueSigma();
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function cholesky(A) {
+  const n = A.length;
+  const L = Array.from({length: n}, () => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let s = 0;
+      for (let k = 0; k < j; k++) s += L[i][k] * L[j][k];
+      if (i === j) L[i][j] = Math.sqrt(Math.max(A[i][i] - s, 1e-10));
+      else L[i][j] = (A[i][j] - s) / L[j][j];
+    }
+  }
+  return L;
+}
+
+function eigvalsSym(A) {
+  // Power iteration for top, deflation for next ones (simplified for small N)
+  const n = A.length;
+  // Use a simple Jacobi method
+  let M = A.map(row => row.slice());
+  for (let iter = 0; iter < 100; iter++) {
+    let p = 0, q = 1, maxOff = Math.abs(M[0][1]);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (Math.abs(M[i][j]) > maxOff) { maxOff = Math.abs(M[i][j]); p = i; q = j; }
+    }
+    if (maxOff < 1e-9) break;
+    const theta = (M[q][q] - M[p][p]) / (2 * M[p][q]);
+    const t = Math.sign(theta) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+    const c = 1 / Math.sqrt(t * t + 1);
+    const s = t * c;
+    const newM = M.map(row => row.slice());
+    newM[p][p] = c * c * M[p][p] - 2 * s * c * M[p][q] + s * s * M[q][q];
+    newM[q][q] = s * s * M[p][p] + 2 * s * c * M[p][q] + c * c * M[q][q];
+    newM[p][q] = newM[q][p] = 0;
+    for (let r = 0; r < n; r++) if (r !== p && r !== q) {
+      newM[r][p] = newM[p][r] = c * M[r][p] - s * M[r][q];
+      newM[r][q] = newM[q][r] = s * M[r][p] + c * M[r][q];
+    }
+    M = newM;
+  }
+  const eigs = [];
+  for (let i = 0; i < n; i++) eigs.push(M[i][i]);
+  return eigs.sort((a, b) => b - a);
+}
+
+function sampleCov(T, seed) {
+  const rng = mulberry32(seed);
+  const L = cholesky(Sigma_true);
+  const data = [];
+  for (let t = 0; t < T; t++) {
+    const z = new Array(N).fill(0).map(() => randn(rng));
+    const x = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) for (let j = 0; j <= i; j++) x[i] += L[i][j] * z[j];
+    data.push(x);
+  }
+  // mean
+  const mean = new Array(N).fill(0);
+  for (const row of data) for (let i = 0; i < N; i++) mean[i] += row[i] / T;
+  // covariance
+  const S = Array.from({length: N}, () => new Array(N).fill(0));
+  for (const row of data) {
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) S[i][j] += (row[i] - mean[i]) * (row[j] - mean[j]) / (T - 1);
+  }
+  return S;
+}
+
+function shrinkConstantCorr(S) {
+  const sigmas = new Array(N).fill(0).map((_, i) => Math.sqrt(S[i][i]));
+  let rhoSum = 0, count = 0;
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+    rhoSum += S[i][j] / (sigmas[i] * sigmas[j]);
+    count++;
+  }
+  const rhoBar = rhoSum / count;
+  const F = Array.from({length: N}, (_, i) => new Array(N).fill(0).map((_, j) => i === j ? S[i][i] : rhoBar * sigmas[i] * sigmas[j]));
+  return F;
+}
+function shrinkIdentity(S) {
+  let avgVar = 0;
+  for (let i = 0; i < N; i++) avgVar += S[i][i];
+  avgVar /= N;
+  return Array.from({length: N}, (_, i) => new Array(N).fill(0).map((_, j) => i === j ? avgVar : 0));
+}
+function shrinkSingleFactor(S) {
+  // Use first PCA factor as approximation
+  const eigs = eigvalsSym(S);
+  const lambdaMax = eigs[0];
+  const restAvg = eigs.slice(1).reduce((a, b) => a + b, 0) / (N - 1);
+  // Build F = lambdaMax (rank-1 approx) + restAvg * I (residual)
+  // Simplified: scale identity by avg
+  return Array.from({length: N}, (_, i) => new Array(N).fill(0).map((_, j) => i === j ? lambdaMax / N + restAvg : lambdaMax / N));
+}
+
+function blend(S, F, delta) {
+  return S.map((row, i) => row.map((s, j) => (1 - delta) * s + delta * F[i][j]));
+}
+
+function update10() {
+  const T = parseInt(document.getElementById('T').value);
+  const delta = parseFloat(document.getElementById('delta').value);
+  const target = parseInt(document.getElementById('target').value);
+  const targetName = ['identity', 'constant correlation', 'single factor'][target];
+  document.getElementById('T_v').textContent = T;
+  document.getElementById('delta_v').textContent = delta.toFixed(2);
+  document.getElementById('target_v').textContent = targetName;
+
+  const S = sampleCov(T, 42);
+  const F = target === 0 ? shrinkIdentity(S) : (target === 1 ? shrinkConstantCorr(S) : shrinkSingleFactor(S));
+  const Shrunk = blend(S, F, delta);
+
+  const eigSample = eigvalsSym(S);
+  const eigShrunk = eigvalsSym(Shrunk);
+  const kappa_s = eigSample[0] / Math.max(eigSample[N - 1], 1e-12);
+  const kappa_sh = eigShrunk[0] / Math.max(eigShrunk[N - 1], 1e-12);
+
+  // Approximate optimal delta via simple heuristic
+  let frob = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) frob += (S[i][j] - F[i][j]) ** 2;
+  const phi = N / T; // proxy for variance
+  const deltaStar = Math.min(1, Math.max(0, phi / (phi + frob)));
+
+  // Out-of-sample variance proxy
+  const w_min_shrunk = (() => {
+    // Solve Shrunk w = ones via Gaussian elimination (simplified Jacobi)
+    let w = new Array(N).fill(1 / N);
+    for (let it = 0; it < 100; it++) {
+      const newW = w.slice();
+      for (let i = 0; i < N; i++) {
+        let off = 0;
+        for (let j = 0; j < N; j++) if (j !== i) off += Shrunk[i][j] * w[j];
+        newW[i] = (1 - off) / Shrunk[i][i];
+      }
+      w = newW;
+    }
+    const s = w.reduce((a, b) => a + b, 0);
+    return w.map(x => x / s);
+  })();
+  let oos_var = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) oos_var += w_min_shrunk[i] * Sigma_true[i][j] * w_min_shrunk[j];
+
+  document.getElementById('kappa_sample').textContent = kappa_s.toFixed(2);
+  document.getElementById('kappa_shrunk').textContent = kappa_sh.toFixed(2);
+  document.getElementById('delta_star').textContent = deltaStar.toFixed(3);
+  document.getElementById('oos_var').textContent = oos_var.toFixed(5);
+
+  Plotly.react('shrinkage_plot', [
+    { x: eigSample.map((_, i) => i + 1), y: eigSample, type: 'scatter', mode: 'lines+markers', name: 'Sample eigenvalues', line: { color: '#c53030' } },
+    { x: eigShrunk.map((_, i) => i + 1), y: eigShrunk, type: 'scatter', mode: 'lines+markers', name: 'Shrunk eigenvalues', line: { color: '#2b6cb0' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Eigenvalue rank' },
+    yaxis: { title: 'Eigenvalue', type: 'log' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['T', 'delta', 'target'].forEach(id => document.getElementById(id).addEventListener('input', update10));
+update10();
+</script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 9: Why Mean-Variance Fails Out of Sample</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 9: Why Mean-Variance Fails Out of Sample</h1>
+<p class="subtitle">Module C, Week 3, Lesson 9. Markowitz is mathematically beautiful and empirically explosive. Diagnose the pathology before learning the cures.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The error maximisation problem</a></li>
+    <li><a href="#s2">Sensitivity of the tangency portfolio</a></li>
+    <li><a href="#s3">Condition number and the geometry of $\Sigma^{-1}$</a></li>
+    <li><a href="#s4">The high-dimensional regime</a></li>
+    <li><a href="#s5">DeMiguel, Garlappi, Uppal: 1/N beats Markowitz</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Mean perturbation $\sigma_\mu$</h3>
+<p>Standard deviation of the noise we add to each asset's expected return $\mu_i$. Real $\mu$ estimates have standard errors of around 1 to 3 percent annualised even with 30 years of monthly data. Slide $\sigma_\mu$ to see what this estimation noise does to the optimal weights.</p>
+<h3>Number of bootstrap trials</h3>
+<p>How many perturbed $\mu$ vectors we draw, each producing a different "optimal" portfolio. The spread of these portfolios tells you the estimation risk.</p>
+<h3>Method toggle</h3>
+<p>Tangency (max Sharpe) vs minimum variance vs equal weight. Tangency uses both $\mu$ and $\Sigma$. Min-var uses only $\Sigma$. Equal weight uses neither. Watch which method's weights are stable.</p>
+<h3>Universe size $N$</h3>
+<p>Number of assets. As $N$ approaches the sample length $T$, the sample covariance becomes singular and $\Sigma^{-1}$ explodes.</p>
+
+<h2 id="s1">1. The error maximisation problem</h2>
+<p>Mean-variance optimisation looks for the portfolio whose weighted average return is highest relative to its variance. When the input $\mu$ has estimation error, the optimiser does something perverse: <strong>it preferentially loads up on assets whose $\mu$ has been overestimated by chance</strong>. The errors do not cancel out across assets; they compound.</p>
+
+<p>This phenomenon was named by Michaud (1989). The math:</p>
+<div class="formula">$$w^\star \propto \Sigma^{-1} (\mu - r_f \mathbf{1})$$</div>
+<p>If your estimate $\hat \mu$ has error $\epsilon$, then $\hat w^\star = w^\star + \Sigma^{-1} \epsilon$. The error in weights is $\Sigma^{-1}$ times the error in means. When $\Sigma^{-1}$ is large in magnitude (which it is when $\Sigma$ has small eigenvalues), the weight error explodes.</p>
+
+<h2 id="s2">2. Sensitivity of tangency vs min-var</h2>
+<p>Tangency is the worst offender because it requires accurate $\mu$. Minimum variance is more robust because it does not depend on $\mu$ at all (only on $\Sigma$). The diagnostic: bootstrap the input data, re-solve, look at the spread of optimal weights.</p>
+
+<h3>Live: error maximisation simulator</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Mean perturbation $\sigma_\mu$ (bp): <span class="value" id="sigma_mu_v">200</span></label>
+      <input type="range" id="sigma_mu" min="10" max="500" step="10" value="200">
+    </div>
+    <div class="control">
+      <label>Number of trials: <span class="value" id="trials_v">200</span></label>
+      <input type="range" id="trials" min="50" max="500" step="10" value="200">
+    </div>
+    <div class="control">
+      <label>Method: <span class="value" id="method_v">tangency</span></label>
+      <input type="range" id="method" min="0" max="2" step="1" value="0">
+    </div>
+  </div>
+  <div id="weights_dist" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Mean weight on asset 1</span><span class="stat-value" id="mean_w1">0</span></div>
+    <div class="stat"><span>Std of weight on asset 1</span><span class="stat-value" id="std_w1">0</span></div>
+    <div class="stat"><span>Max single weight observed</span><span class="stat-value" id="max_w">0</span></div>
+    <div class="stat"><span>Sum of |weights| (turnover)</span><span class="stat-value" id="turnover">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide method to "tangency" with $\sigma_\mu = 200$ bp.</strong> The histogram of $w_1$ across 200 bootstraps spans a wide range, often from negative to over 100%. Switch method to "min-var": the histogram collapses to a tight cluster. Switch to "equal weight": single point. The same input noise produces wildly different weight stability depending on method. This is error maximisation.
+</div>
+
+<h2 id="s3">3. Condition number and the geometry of $\Sigma^{-1}$</h2>
+<p>The condition number of a matrix is the ratio of its largest eigenvalue to its smallest:</p>
+<div class="formula">$$\kappa(\Sigma) = \frac{\lambda_{\max}(\Sigma)}{\lambda_{\min}(\Sigma)}$$</div>
+<p>$\kappa = 1$ means rotational symmetry (round ellipse). $\kappa$ large means a pancake. Inverting $\Sigma$ amplifies any error in $\Sigma$ or $\mu$ by roughly $\kappa$. Real-world $\kappa$ on 50 to 500 asset universes routinely exceeds 1000.</p>
+
+<p>What blows up $\kappa$? Two things in the data, and one in the universe choice:</p>
+<ol>
+  <li><strong>Highly correlated assets.</strong> If two assets have $\rho = 0.99$, the ellipse pancakes along their axis.</li>
+  <li><strong>Low-vol assets mixed with high-vol.</strong> Bonds with $\sigma = 5\%$ and crypto with $\sigma = 80\%$ produce eigenvalue gaps of 256x just from the diagonal.</li>
+  <li><strong>$T \approx N$.</strong> When sample length $T$ is close to the number of assets $N$, the smallest eigenvalues approach zero by Marcenko-Pastur. Condition number diverges.</li>
+</ol>
+
+<h2 id="s4">4. The high-dimensional regime</h2>
+<p>Random matrix theory tells us that for $T$ observations on $N$ assets with true covariance $I$, the sample covariance has eigenvalues spread over the Marcenko-Pastur interval</p>
+<div class="formula">$$\lambda_\pm = (1 \pm \sqrt{N/T})^2$$</div>
+<p>The smallest eigenvalue is $(1 - \sqrt{N/T})^2$. When $N = T$, it hits zero exactly. The condition number is</p>
+<div class="formula">$$\kappa = \left(\frac{1 + \sqrt{N/T}}{1 - \sqrt{N/T}}\right)^2$$</div>
+<p>For $N/T = 0.5$, $\kappa \approx 33$. For $N/T = 0.9$, $\kappa \approx 360$. For $N/T = 0.99$, $\kappa \approx 40000$. The cliff is real and steep.</p>
+
+<h2 id="s5">5. DeMiguel, Garlappi, Uppal (2009)</h2>
+<p>The paper that put a number on the failure. DGU compared 14 mean-variance strategies on seven datasets. Their finding: <strong>none of the optimised methods beat 1/N (equal weight) consistently out of sample, after costs.</strong> The required sample length to make optimisation pay over equal weight was roughly 3000 months for a 25-asset universe. Nobody has 3000 months.</p>
+
+<p>The conclusions of DGU were controversial but the empirical pattern is robust: a method that uses $\Sigma^{-1}$ on noisy data performs worse than a method that does not. The remainder of Module C is about how to fix this.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy, conceptual parity):</strong> Macrosynergy does not run Markowitz in production. Their answer to error maximisation is conceptual parity: equal-weight macro signals within a theme, equal-weight themes across an asset, equal-weight assets across a strategy. Articles 3 (cross-asset relative value), 28 (signal optimisation), and 50 (signal evaluation) all explicitly avoid optimising weights. The Sharpe loss vs an "ideal" optimised weighting is small. The robustness gain is large. This is the empirical philosophy that DGU formalised.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 The derivative of optimal weights with respect to $\mu$</h3>
+<p>For unconstrained mean-variance with budget constraint $\mathbf{1}^\top w = 1$:</p>
+<div class="formula">$$\frac{\partial w^\star}{\partial \mu} = \frac{1}{\lambda} \left(\Sigma^{-1} - \frac{\Sigma^{-1} \mathbf{1} \mathbf{1}^\top \Sigma^{-1}}{\mathbf{1}^\top \Sigma^{-1} \mathbf{1}}\right)$$</div>
+<p>The norm of this matrix is dominated by $\lambda_{\max}(\Sigma^{-1}) = 1 / \lambda_{\min}(\Sigma)$. Small eigenvalues of $\Sigma$ create large gradients.</p>
+
+<h3>6.2 Marcenko-Pastur for sample covariance</h3>
+<p>For $T \times N$ random Gaussian data with true covariance $I$, the empirical eigenvalue density of the sample covariance converges to the Marcenko-Pastur distribution:</p>
+<div class="formula">$$f(\lambda) = \frac{1}{2\pi \sigma^2} \frac{\sqrt{(\lambda_+ - \lambda)(\lambda - \lambda_-)}}{\lambda} \cdot \mathbb{1}_{[\lambda_-, \lambda_+]}$$</div>
+<p>with $\lambda_\pm = \sigma^2 (1 \pm \sqrt{N/T})^2$. This tells you exactly how spread out your sample eigenvalues should be when there is no real covariance structure. The cleaning step in Lesson 13 cuts eigenvalues that fall inside this interval (treating them as noise).</p>
+
+<h3>6.3 Why min-var is more stable than tangency</h3>
+<p>The min-var weight $w_{\min} = \Sigma^{-1} \mathbf{1} / (\mathbf{1}^\top \Sigma^{-1} \mathbf{1})$ does not depend on $\mu$ at all. The tangency weight $w_T \propto \Sigma^{-1}(\mu - r_f \mathbf{1})$ has the additional sensitivity to $\mu$. So tangency variance equals min-var variance plus a term scaled by $\text{Var}(\mu)$. Empirically, min-var weights have 3 to 5 times smaller bootstrap standard error than tangency weights.</p>
+
+<h3>6.4 The "James-Stein" cure preview</h3>
+<p>James-Stein (1961) showed that for the multivariate mean estimation problem with $N \ge 3$, the sample mean is dominated by a shrinkage estimator. Shrink your mean estimate toward the grand mean (or any fixed target) and you reduce mean squared error in expectation. The same principle works for $\Sigma$ (Lesson 10) and is the formal basis for Bayesian portfolio choice.</p>
+
+<h3>6.5 Why 1/N is hard to beat</h3>
+<p>Equal weight has zero estimation error in $\mu$ (none used), and uses no $\Sigma$ inverse (no amplification). Its only "error" is using uniform weights when the true optimal is non-uniform. DGU show that for typical estimation noise, the bias from uniform weights is smaller than the variance from optimisation. Equal weight's "model" is $\mu = c \mathbf{1}$ for some $c$, $\Sigma = \sigma^2 I$. This null model is wrong, but it is wrong in a robust way.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Bootstrap weight distribution</h3>
+<pre><code>def bootstrap_weights(mu, Sigma, sigma_mu=0.005, n_trials=200, method='tangency', seed=0):
+    rng = np.random.default_rng(seed)
+    weights = []
+    for _ in range(n_trials):
+        mu_pert = mu + sigma_mu * rng.standard_normal(len(mu))
+        if method == 'tangency':
+            w = np.linalg.solve(Sigma, mu_pert - 0.02)
+            w = w / w.sum()
+        elif method == 'minvar':
+            w = np.linalg.solve(Sigma, np.ones(len(mu)))
+            w = w / w.sum()
+        else:
+            w = np.ones(len(mu)) / len(mu)
+        weights.append(w)
+    return np.array(weights)</code></pre>
+
+<h3>Exercise B: Condition number sweep</h3>
+<p>For a 20-asset universe, sample $T$ from 30 to 1000. Plot $\kappa(\hat \Sigma)$ vs $T$. Compare to the Marcenko-Pastur prediction.</p>
+
+<h3>Exercise C: DeMiguel-style horse race</h3>
+<p>On real or synthetic data, compute out-of-sample Sharpe for: tangency, min-var, equal weight. Use rolling 60-month windows. Tabulate Sharpe and turnover. Equal weight should be competitive.</p>
+
+<h3>Exercise D: Marcenko-Pastur visualisation</h3>
+<p>Generate 1000 trials of $N=50$, $T=100$ Gaussian data with true covariance $I$. Plot the histogram of eigenvalues. Overlay the analytical MP density. They should match.</p>
+
+<h3>Exercise E: The role of correlations</h3>
+<p>Construct two universes, both with $N=10$. Universe A has block-diagonal correlation (3 blocks of 0.9 within, 0.0 between). Universe B has uniform 0.3 correlation. Compute $\kappa$ and bootstrap weight std for tangency. A should be far worse than B.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the tangency portfolio overweight assets with overestimated $\mu$ rather than averaging the errors out across assets?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>For a 5-asset universe with $\sigma = [0.20, 0.10, 0.10, 0.20, 0.30]$ and pairwise correlations all 0.5, compute $\kappa(\Sigma)$. Then perturb $\mu$ by 100 bp and compare tangency weights before and after.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For $N/T = 0.5$ and true covariance $I$, what fraction of sample eigenvalues fall below 0.1 just by chance?</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_08_sharpe_statistics.html">← Lesson 8</a></span>
+  <span><a href="lesson_10_shrinkage.html">Next: Lesson 10, Shrinkage →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+      throwOnError: false
+    });
+  }
+});
+
+const N = 5;
+const mu_true = [0.08, 0.04, 0.06, 0.10, 0.05];
+const sigma_v = [0.15, 0.05, 0.18, 0.20, 0.08];
+const rho = [
+  [1.0, -0.2, 0.1, 0.7, 0.3],
+  [-0.2, 1.0, 0.0, -0.1, 0.6],
+  [0.1, 0.0, 1.0, 0.2, 0.1],
+  [0.7, -0.1, 0.2, 1.0, 0.3],
+  [0.3, 0.6, 0.1, 0.3, 1.0],
+];
+const Sigma = (() => {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(sigma_v[i] * sigma_v[j] * rho[i][j]);
+    S.push(r);
+  }
+  return S;
+})();
+
+function inv(A) {
+  const n = A.length;
+  const M = A.map((r, i) => r.concat(Array.from({length: n}, (_, j) => (i === j ? 1 : 0))));
+  for (let i = 0; i < n; i++) {
+    let pivot = M[i][i];
+    if (Math.abs(pivot) < 1e-12) {
+      for (let r2 = i + 1; r2 < n; r2++) if (Math.abs(M[r2][i]) > 1e-12) { [M[i], M[r2]] = [M[r2], M[i]]; pivot = M[i][i]; break; }
+    }
+    for (let j = 0; j < 2 * n; j++) M[i][j] /= pivot;
+    for (let r2 = 0; r2 < n; r2++) if (r2 !== i) { const f = M[r2][i]; for (let j = 0; j < 2 * n; j++) M[r2][j] -= f * M[i][j]; }
+  }
+  return M.map(row => row.slice(n));
+}
+const SigmaInv = inv(Sigma);
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function update9() {
+  const sigma_mu = parseFloat(document.getElementById('sigma_mu').value) / 10000;
+  const trials = parseInt(document.getElementById('trials').value);
+  const method = parseInt(document.getElementById('method').value);
+  const methodName = ['tangency', 'minvar', 'equalweight'][method];
+  document.getElementById('sigma_mu_v').textContent = (sigma_mu * 10000).toFixed(0);
+  document.getElementById('trials_v').textContent = trials;
+  document.getElementById('method_v').textContent = methodName;
+
+  const rng = mulberry32(42);
+  const all_w1 = [], all_max = [], all_turn = [];
+  let mean_w1 = 0;
+  for (let t = 0; t < trials; t++) {
+    const mu_pert = mu_true.map(m => m + sigma_mu * randn(rng));
+    let w;
+    if (method === 0) {
+      const excess = mu_pert.map(m => m - 0.02);
+      w = matVec(SigmaInv, excess);
+      const s = w.reduce((a, b) => a + b, 0);
+      w = w.map(x => x / s);
+    } else if (method === 1) {
+      w = matVec(SigmaInv, [1, 1, 1, 1, 1]);
+      const s = w.reduce((a, b) => a + b, 0);
+      w = w.map(x => x / s);
+    } else {
+      w = [0.2, 0.2, 0.2, 0.2, 0.2];
+    }
+    all_w1.push(w[0]);
+    mean_w1 += w[0];
+    all_max.push(Math.max(...w));
+    all_turn.push(w.reduce((a, x) => a + Math.abs(x), 0));
+  }
+  mean_w1 /= trials;
+  const var_w1 = all_w1.reduce((a, x) => a + (x - mean_w1) ** 2, 0) / trials;
+  const std_w1 = Math.sqrt(var_w1);
+  const max_overall = Math.max(...all_max);
+  const mean_turn = all_turn.reduce((a, b) => a + b, 0) / trials;
+
+  document.getElementById('mean_w1').textContent = mean_w1.toFixed(3);
+  document.getElementById('std_w1').textContent = std_w1.toFixed(3);
+  document.getElementById('max_w').textContent = max_overall.toFixed(2);
+  document.getElementById('turnover').textContent = mean_turn.toFixed(2);
+
+  Plotly.react('weights_dist', [
+    { x: all_w1, type: 'histogram', nbinsx: 50, marker: { color: '#2b6cb0' }, name: 'w_1 across bootstraps' }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Weight on asset 1 (across ' + trials + ' bootstrap trials)' },
+    yaxis: { title: 'Frequency' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['sigma_mu', 'trials', 'method'].forEach(id => document.getElementById(id).addEventListener('input', update9));
+update9();
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 13: Covariance Estimation in Depth</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 13: Covariance Estimation in Depth</h1>
+<p class="subtitle">Module C, Week 3, Lesson 13. The most consequential input to any portfolio. Six estimators in production use, each with its own footgun.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The six estimators</a></li>
+    <li><a href="#s2">Random matrix theory cleaning</a></li>
+    <li><a href="#s3">Factor model covariance</a></li>
+    <li><a href="#s4">Hierarchical / clustered</a></li>
+    <li><a href="#s5">Picking among them</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Estimator type</h3>
+<p>Six choices: sample, EWMA, Ledoit-Wolf shrinkage, single-factor, RMT-cleaned, hierarchical block. Each has different bias-variance trade-offs.</p>
+<h3>Sample size T, universe size N</h3>
+<p>The cliff at $T \approx N$ is real. RMT cleaning is most useful when $T/N < 5$. Sample covariance works for $T/N > 30$.</p>
+<h3>EWMA half-life</h3>
+<p>Shorter = more responsive to recent regime, less stable. RiskMetrics standard: ~30-day half-life on daily data.</p>
+
+<h2 id="s1">1. The six estimators</h2>
+<ol>
+  <li><strong>Sample.</strong> $S = (X - \bar X)^\top (X - \bar X) / (T - 1)$. Unbiased but noisy.</li>
+  <li><strong>EWMA.</strong> $S_t = \alpha r_{t-1} r_{t-1}^\top + (1 - \alpha) S_{t-1}$. Time-varying, responsive.</li>
+  <li><strong>Ledoit-Wolf shrinkage.</strong> Lesson 10. Linear blend with structured target.</li>
+  <li><strong>Single-factor.</strong> $\Sigma = \beta \beta^\top \sigma_m^2 + D$. Parsimonious; $D$ is the diagonal of residuals.</li>
+  <li><strong>RMT-cleaned.</strong> Eigenvalue clipping. Replace noise eigenvalues with their average.</li>
+  <li><strong>Hierarchical block.</strong> Cluster assets into groups; within-block correlations preserved, between-block shrunk.</li>
+</ol>
+
+<h2 id="s2">2. Random Matrix Theory cleaning</h2>
+<p>Sample covariance eigenvalues that fall inside the Marcenko-Pastur interval $[\lambda_-, \lambda_+]$ are pure noise. Replace them with their average:</p>
+<div class="formula">$$\hat \lambda_i = \begin{cases} \lambda_i & \text{if outside MP interval} \\ \bar \lambda_{\text{noise}} & \text{otherwise} \end{cases}$$</div>
+<p>Reconstruct $\hat \Sigma = V \hat \Lambda V^\top$. The result has the same trace as the original (variance preserved) but is much better conditioned. Laloux et al. (2000) introduced this for finance.</p>
+
+<h2 id="s3">3. Factor model covariance</h2>
+<p>Decompose $\Sigma$ as a low-rank factor part plus an idiosyncratic diagonal:</p>
+<div class="formula">$$\Sigma = B \Omega_F B^\top + D$$</div>
+<p>$B$ is $N \times K$ factor loadings, $\Omega_F$ is $K \times K$ factor covariance, $D$ is diagonal residual variance. Two flavours:</p>
+<ul>
+  <li><strong>Statistical.</strong> $B$ from PCA. Factors are eigendirections.</li>
+  <li><strong>Fundamental.</strong> $B$ from observable factors (industry, style, country, currency). The BARRA approach.</li>
+</ul>
+<p>Factor covariance is well-conditioned for any $T$ as long as $K \ll N$. Standard in equity risk models for $N > 100$.</p>
+
+<h3>Live: estimator comparison</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Sample size $T$: <span class="value" id="T_v">100</span></label>
+      <input type="range" id="T" min="30" max="500" step="10" value="100">
+    </div>
+    <div class="control">
+      <label>Estimator: <span class="value" id="est_v">Sample</span></label>
+      <input type="range" id="est" min="0" max="3" step="1" value="0">
+    </div>
+  </div>
+  <div id="cov_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Largest eigenvalue</span><span class="stat-value" id="ev_max">0</span></div>
+    <div class="stat"><span>Smallest eigenvalue</span><span class="stat-value" id="ev_min">0</span></div>
+    <div class="stat"><span>Condition number</span><span class="stat-value" id="cond">0</span></div>
+    <div class="stat"><span>Min-var portfolio vol (estimated)</span><span class="stat-value" id="mvar_est">0</span></div>
+  </div>
+</div>
+
+<h2 id="s4">4. Hierarchical / clustered covariance</h2>
+<p>Cluster assets by correlation distance. Build a block covariance: full sample covariance within block, shrunken (or factor-only) between blocks. Useful when there are obvious sectors or regions. Bridge to HRP (Lesson 15).</p>
+
+<h2 id="s5">5. Picking the right estimator</h2>
+<p>Heuristic decision tree:</p>
+<ul>
+  <li>$N < 10$, $T > 100 N$: sample is fine.</li>
+  <li>$N$ moderate, $T \approx 30 N$: Ledoit-Wolf shrinkage.</li>
+  <li>$N$ large, $T < 5 N$: RMT cleaning or factor model.</li>
+  <li>Time-varying environment: EWMA.</li>
+  <li>Equity universes with clear sectors: factor model.</li>
+  <li>Heterogeneous universes (cross-asset): hierarchical block.</li>
+</ul>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 37, 99, 89):</strong> Macrosynergy uses PCA (article 37) to extract macro factors and reduce dimensionality. Article 99 surveys six volatility estimators (the diagonal of $\Sigma$). Article 89 uses the eigenstructure of correlation matrices to define market regimes. They almost never use raw sample covariance; the factor model approach dominates because it forces interpretable structure.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Bias-variance for covariance estimators</h3>
+<p>Sample $S$ has zero bias and high variance. Shrinkage trades bias for variance. Factor models have parametric bias from the factor structure assumption but zero variance for any $T$ (given known $B$). RMT cleaning is asymptotically unbiased and lower variance than sample.</p>
+<h3>6.2 Marcenko-Pastur for cleaning</h3>
+<p>For $T$ Gaussian observations on $N$ assets with true $\Sigma = \sigma^2 I$, sample eigenvalues lie in $[\sigma^2 (1 - \sqrt{N/T})^2, \sigma^2(1 + \sqrt{N/T})^2]$ asymptotically. Eigenvalues outside this interval reflect real signal.</p>
+<h3>6.3 Single-factor model derivation</h3>
+<p>Assume $r_i = \alpha_i + \beta_i r_m + \epsilon_i$ with $\epsilon_i$ idiosyncratic. Then $\Sigma_{ij} = \beta_i \beta_j \sigma_m^2 + \delta_{ij} \sigma_{\epsilon_i}^2$. Estimate $\beta$ from $T$ regressions. Total parameters: $2N + 1$ vs $N(N+1)/2$ for sample. Stable for any $T > 30$.</p>
+<h3>6.4 Nonlinear shrinkage (Ledoit-Wolf 2017)</h3>
+<p>Apply different shrinkage intensity to different eigenvalues, calibrated via the Stieltjes transform of the limiting eigenvalue distribution. Optimal in MSE among rotation-equivariant estimators.</p>
+<h3>6.5 EWMA stationarity</h3>
+<p>EWMA is non-stationary in general, but its conditional variance equation $\sigma_t^2 = \alpha r_{t-1}^2 + (1 - \alpha) \sigma_{t-1}^2$ is GARCH(1,1) with no constant term. The unconditional variance is undefined unless you add a constant.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: All six estimators</h3>
+<pre><code>from sklearn.covariance import LedoitWolf, OAS
+
+def all_estimators(returns):
+    S = np.cov(returns.T)
+    ewma = returns.ewm(halflife=22).cov().iloc[-len(returns.columns):]
+    lw = LedoitWolf().fit(returns).covariance_
+    # single factor
+    market = returns.mean(axis=1)
+    betas = np.array([np.cov(returns[c], market)[0,1] / market.var() for c in returns.columns])
+    sf = np.outer(betas, betas) * market.var() + np.diag(np.diag(S - np.outer(betas, betas) * market.var()))
+    return {'sample': S, 'ewma': ewma, 'lw': lw, 'sf': sf}</code></pre>
+
+<h3>Exercise B: RMT cleaning from scratch</h3>
+<pre><code>def rmt_clean(S, T):
+    N = S.shape[0]
+    eigvals, eigvecs = np.linalg.eigh(S)
+    sigma2 = eigvals.mean()
+    lambda_plus = sigma2 * (1 + np.sqrt(N / T)) ** 2
+    noise_mask = eigvals < lambda_plus
+    eigvals[noise_mask] = eigvals[noise_mask].mean()
+    return eigvecs @ np.diag(eigvals) @ eigvecs.T</code></pre>
+
+<h3>Exercise C: Out-of-sample horse race</h3>
+<p>On rolling 60-month windows, compute min-var portfolios under each of the six estimators. Report OOS portfolio variance. RMT, factor, and shrinkage should beat raw sample.</p>
+
+<h3>Exercise D: Marcenko-Pastur visualisation</h3>
+<p>Generate $T=100$ Gaussian observations on $N=50$ assets with true $\Sigma = I$. Histogram the sample eigenvalues. Overlay the MP density.</p>
+
+<h3>Exercise E: Hierarchical block</h3>
+<p>Build a hierarchical block covariance using `scipy.cluster.hierarchy.linkage` to find clusters from the correlation distance.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why is the factor model covariance always well-conditioned for $K \ll N$?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify the RMT cleaning to also clip eigenvalues that are unrealistically large (above $4 \sigma^2$).</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For $N = 50$, $T = 100$, with true $\Sigma = I$, what fraction of sample eigenvalues lie inside the MP interval?</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_12_robust.html">← Lesson 12</a></span>
+  <span><a href="lesson_14_erc.html">Next: Lesson 14, Equal Risk Contribution →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 10;
+const true_sigma = [0.20, 0.10, 0.18, 0.12, 0.22, 0.08, 0.15, 0.25, 0.16, 0.14];
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function buildTrueSigma() {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) {
+      const rho = i === j ? 1 : 0.2 + 0.2 * Math.cos(i + j);
+      r.push(true_sigma[i] * true_sigma[j] * rho);
+    }
+    S.push(r);
+  }
+  return S;
+}
+const Sigma_true = buildTrueSigma();
+
+function cholesky(A) {
+  const n = A.length;
+  const L = Array.from({length: n}, () => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) {
+    let s = 0;
+    for (let k = 0; k < j; k++) s += L[i][k] * L[j][k];
+    if (i === j) L[i][j] = Math.sqrt(Math.max(A[i][i] - s, 1e-10));
+    else L[i][j] = (A[i][j] - s) / L[j][j];
+  }
+  return L;
+}
+
+function sampleCov(T, seed) {
+  const rng = mulberry32(seed);
+  const L = cholesky(Sigma_true);
+  const data = [];
+  for (let t = 0; t < T; t++) {
+    const z = new Array(N).fill(0).map(() => randn(rng));
+    const x = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) for (let j = 0; j <= i; j++) x[i] += L[i][j] * z[j];
+    data.push(x);
+  }
+  const mean = new Array(N).fill(0);
+  for (const row of data) for (let i = 0; i < N; i++) mean[i] += row[i] / T;
+  const S = Array.from({length: N}, () => new Array(N).fill(0));
+  for (const row of data) for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) S[i][j] += (row[i] - mean[i]) * (row[j] - mean[j]) / (T - 1);
+  return S;
+}
+
+function eigvalsSym(A) {
+  const n = A.length;
+  let M = A.map(row => row.slice());
+  for (let iter = 0; iter < 200; iter++) {
+    let p = 0, q = 1, maxOff = 0;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (Math.abs(M[i][j]) > maxOff) { maxOff = Math.abs(M[i][j]); p = i; q = j; }
+    if (maxOff < 1e-9) break;
+    const theta = (M[q][q] - M[p][p]) / (2 * M[p][q]);
+    const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+    const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+    const newM = M.map(row => row.slice());
+    newM[p][p] = c * c * M[p][p] - 2 * s * c * M[p][q] + s * s * M[q][q];
+    newM[q][q] = s * s * M[p][p] + 2 * s * c * M[p][q] + c * c * M[q][q];
+    newM[p][q] = newM[q][p] = 0;
+    for (let r = 0; r < n; r++) if (r !== p && r !== q) {
+      newM[r][p] = newM[p][r] = c * M[r][p] - s * M[r][q];
+      newM[r][q] = newM[q][r] = s * M[r][p] + c * M[r][q];
+    }
+    M = newM;
+  }
+  return new Array(n).fill(0).map((_, i) => M[i][i]).sort((a, b) => b - a);
+}
+
+function shrinkLW(S, T) {
+  const sigmas = new Array(N).fill(0).map((_, i) => Math.sqrt(S[i][i]));
+  let rhoSum = 0, count = 0;
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { rhoSum += S[i][j] / (sigmas[i] * sigmas[j]); count++; }
+  const rhoBar = rhoSum / count;
+  const F = Array.from({length: N}, (_, i) => new Array(N).fill(0).map((_, j) => i === j ? S[i][i] : rhoBar * sigmas[i] * sigmas[j]));
+  const delta = Math.min(1, N / T);
+  return S.map((row, i) => row.map((s, j) => (1 - delta) * s + delta * F[i][j]));
+}
+
+function rmtClean(S, T) {
+  const eigs = eigvalsSym(S);
+  const avg = eigs.reduce((a, b) => a + b, 0) / N;
+  const lambdaPlus = avg * (1 + Math.sqrt(N / T)) ** 2;
+  // Approximation: replace eigenvalues below cutoff with their mean
+  // (For full implementation we would need eigenvectors too)
+  return { eigs: eigs.map(e => e < lambdaPlus ? avg / 2 : e), lambdaPlus };
+}
+
+function update13() {
+  const T = parseInt(document.getElementById('T').value);
+  const est = parseInt(document.getElementById('est').value);
+  const estName = ['Sample', 'EWMA (proxy)', 'Ledoit-Wolf', 'RMT-cleaned'][est];
+  document.getElementById('T_v').textContent = T;
+  document.getElementById('est_v').textContent = estName;
+
+  const S = sampleCov(T, 42);
+  let eigs;
+  if (est === 0) eigs = eigvalsSym(S);
+  else if (est === 1) eigs = eigvalsSym(sampleCov(Math.floor(T * 0.5), 43));
+  else if (est === 2) eigs = eigvalsSym(shrinkLW(S, T));
+  else eigs = rmtClean(S, T).eigs.sort((a, b) => b - a);
+
+  const trueEigs = eigvalsSym(Sigma_true);
+
+  document.getElementById('ev_max').textContent = eigs[0].toFixed(5);
+  document.getElementById('ev_min').textContent = eigs[N - 1].toFixed(5);
+  document.getElementById('cond').textContent = (eigs[0] / Math.max(eigs[N - 1], 1e-12)).toFixed(2);
+  // Min-var portfolio vol estimated under estimator
+  // Approximate as 1 / sqrt(sum 1/eig)
+  let s = 0;
+  for (const e of eigs) s += 1 / Math.max(e, 1e-12);
+  const minVarVol = Math.sqrt(N / s) * Math.sqrt(252) * 100;
+  document.getElementById('mvar_est').textContent = minVarVol.toFixed(2) + '%';
+
+  Plotly.react('cov_plot', [
+    { x: eigs.map((_, i) => i + 1), y: eigs, type: 'scatter', mode: 'lines+markers', name: estName, line: { color: '#2b6cb0' } },
+    { x: trueEigs.map((_, i) => i + 1), y: trueEigs, type: 'scatter', mode: 'lines', name: 'True $\\Sigma$ eigenvalues', line: { color: '#22543d', dash: 'dash' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Eigenvalue rank' },
+    yaxis: { title: 'Eigenvalue', type: 'log' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['T', 'est'].forEach(id => document.getElementById(id).addEventListener('input', update13));
+update13();
+</script>
+</body>
+</html>

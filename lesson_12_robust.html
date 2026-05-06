@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 12: Robust Optimisation</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 12: Robust Optimisation</h1>
+<p class="subtitle">Module C, Week 4, Lesson 12. Bayesian shrinkage averages over uncertainty. Robust optimisation gives a worst-case guarantee. Different philosophy, different tool.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The robust philosophy</a></li>
+    <li><a href="#s2">Uncertainty sets</a></li>
+    <li><a href="#s3">The robust mean-variance SOCP</a></li>
+    <li><a href="#s4">Resampled efficiency (Michaud)</a></li>
+    <li><a href="#s5">Distributionally robust optimisation</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Uncertainty radius $\kappa$</h3>
+<p>How big the uncertainty set is. Larger $\kappa$ means more conservative. $\kappa = 0$ recovers nominal Markowitz; $\kappa \to \infty$ approaches equal weight.</p>
+<h3>Geometry: box vs ellipsoidal</h3>
+<p>Box uncertainty: each $\mu_i$ varies independently in an interval. Ellipsoidal: joint variation, can capture correlation in estimation errors.</p>
+<h3>Method toggle</h3>
+<p>Robust SOCP, resampled efficiency, plain MV. Compare side-by-side.</p>
+
+<h2 id="s1">1. The robust philosophy</h2>
+<p>Bayesian: average over uncertainty using a prior. Robust: optimise the worst case over an uncertainty set.</p>
+<div class="formula">$$\max_w \min_{\mu \in \mathcal{U}} \left[ w^\top \mu - (\lambda/2) w^\top \Sigma w \right] \text{ s.t. } \mathbf{1}^\top w = 1$$</div>
+<p>Read: pick $w$ to maximise utility under the worst $\mu$ in your uncertainty set $\mathcal{U}$. Robust optimisation gives a deterministic guarantee: no matter which $\mu \in \mathcal{U}$ realises, your portfolio's utility is at least the optimal value.</p>
+
+<h2 id="s2">2. Uncertainty sets</h2>
+<ul>
+  <li><strong>Box:</strong> $\mathcal{U} = \{\mu : |\mu_i - \hat \mu_i| \le \delta_i\}$. Each component varies independently. Most conservative because it does not use correlation structure.</li>
+  <li><strong>Ellipsoidal:</strong> $\mathcal{U} = \{\mu : (\mu - \hat \mu)^\top \Theta^{-1} (\mu - \hat \mu) \le \kappa^2\}$ for some matrix $\Theta$. Most popular: tractable as SOCP, captures joint estimation error.</li>
+  <li><strong>Polyhedral:</strong> $\mathcal{U} = \{\mu : A \mu \le b\}$. Linear inequalities. Tractable as LP.</li>
+  <li><strong>Wasserstein ball:</strong> $\mathcal{U}$ is a set of probability distributions within Wasserstein distance $\rho$ of an empirical distribution. The most modern formulation.</li>
+</ul>
+
+<h2 id="s3">3. The robust SOCP</h2>
+<p>For ellipsoidal uncertainty on $\mu$:</p>
+<div class="formula">$$\max_w \, \hat \mu^\top w - \kappa \sqrt{w^\top \Theta w} - (\lambda/2) w^\top \Sigma w$$</div>
+<p>The penalty term $-\kappa \sqrt{w^\top \Theta w}$ penalises portfolios with high estimation-error exposure. This is a second-order cone program (SOCP), tractable in cvxpy with one line of code.</p>
+
+<h3>Live: robust frontier explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Uncertainty radius $\kappa$: <span class="value" id="kappa_v">0.5</span></label>
+      <input type="range" id="kappa" min="0" max="3" step="0.1" value="0.5">
+    </div>
+    <div class="control">
+      <label>Risk aversion $\lambda$: <span class="value" id="lam_v">5</span></label>
+      <input type="range" id="lam" min="0.5" max="20" step="0.5" value="5">
+    </div>
+  </div>
+  <div id="robust_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Nominal Sharpe</span><span class="stat-value" id="nom_sr">0</span></div>
+    <div class="stat"><span>Robust Sharpe (worst case)</span><span class="stat-value" id="rob_sr">0</span></div>
+    <div class="stat"><span>Concentration (max weight)</span><span class="stat-value" id="conc">0</span></div>
+    <div class="stat"><span>Effective N</span><span class="stat-value" id="enb">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Crank $\kappa$ from 0 to 3.</strong> Concentration drops, weights diverge less from equal. Effective N rises. Robust optimisation is regularisation by another name.
+</div>
+
+<h2 id="s4">4. Resampled efficiency (Michaud)</h2>
+<p>Michaud (1998) proposed a non-parametric robustification: bootstrap your input data many times, solve Markowitz on each bootstrap, average the resulting weights. The averaged weights are smoother than any single optimisation. Equivalent to Bayesian with an implicit empirical prior.</p>
+
+<h2 id="s5">5. Distributionally robust optimisation</h2>
+<p>Modern frontier. Instead of an uncertainty set on $\mu$, work with a set of probability distributions on returns:</p>
+<div class="formula">$$\min_w \max_{P \in \mathcal{P}} \mathbb{E}_P[L(w, r)]$$</div>
+<p>where $\mathcal{P}$ is, e.g., a Wasserstein ball around the empirical distribution. DRO unifies robust optimisation, Bayesian, and regularisation. Computational frontier work.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 4, 45):</strong> Macrosynergy's regression-based ML pipeline uses ridge (a flavour of robust optimisation) with adaptive shrinkage. Article 45's "signal reliability adjustment" is Bayesian-flavoured robust shrinkage that scales positions by the inverse of recent forecast error. The MS philosophy: never trust the optimiser's confidence. Use methods that produce stable, conservative weights. Robust optimisation aligns with this perfectly.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Robust MV reformulation as SOCP</h3>
+<p>The inner minimisation $\min_{\mu \in \mathcal{U}} w^\top \mu$ over the ellipsoid $\{(\mu - \hat\mu)^\top \Theta^{-1} (\mu - \hat\mu) \le \kappa^2\}$ has closed form $\hat\mu^\top w - \kappa \sqrt{w^\top \Theta w}$ by Cauchy-Schwarz. Substituting back gives the outer max as a deterministic SOCP.</p>
+<h3>6.2 Equivalence to Bayesian shrinkage</h3>
+<p>For Gaussian uncertainty, robust MV with $\Theta = (\hat \Sigma)$ gives identical weights to Bayesian MV with shrinkage prior. Robust + Gaussian $\equiv$ ridge.</p>
+<h3>6.3 Wasserstein DRO as regularisation</h3>
+<p>Mohajerin Esfahani and Kuhn (2018) show that Wasserstein DRO is equivalent to a regularised empirical risk minimisation. The Wasserstein radius plays the role of regularisation strength.</p>
+<h3>6.4 Resampled vs robust</h3>
+<p>Resampled (Michaud) is averaged over uncertainty (Bayesian flavour). Robust SOCP is worst case (frequentist guarantee). Empirically, resampled often outperforms robust because real estimation errors are not as bad as the worst case.</p>
+<h3>6.5 Conservatism and the price of robustness</h3>
+<p>The robust portfolio gives up Sharpe to gain stability. The trade-off is parameterised by $\kappa$. Modern papers calibrate $\kappa$ to match a desired level of out-of-sample performance.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Robust MV with cvxpy</h3>
+<pre><code>import cvxpy as cp
+
+def robust_mv(mu_hat, Theta_chol, Sigma, lam, kappa):
+    n = len(mu_hat)
+    w = cp.Variable(n)
+    obj = cp.Maximize(mu_hat @ w - kappa * cp.norm(Theta_chol.T @ w, 2) - 0.5 * lam * cp.quad_form(w, Sigma))
+    cp.Problem(obj, [cp.sum(w) == 1]).solve()
+    return w.value</code></pre>
+
+<h3>Exercise B: Resampled efficiency</h3>
+<pre><code>def resampled_efficiency(returns, lam, n_boot=500, seed=0):
+    rng = np.random.default_rng(seed)
+    weights = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, len(returns), size=len(returns))
+        sample = returns[idx]
+        mu_b = sample.mean(axis=0)
+        Sigma_b = np.cov(sample.T)
+        w = markowitz(mu_b, Sigma_b, lam)
+        weights.append(w)
+    return np.mean(weights, axis=0)</code></pre>
+
+<h3>Exercise C: Wasserstein DRO simplified</h3>
+<p>Approximate the Wasserstein DRO as a regularised problem with regularisation $\sqrt{\rho} \|w\|_2$. Solve and compare to robust SOCP.</p>
+
+<h3>Exercise D: Calibrate $\kappa$ via cross-validation</h3>
+<p>Sweep $\kappa$ on a hold-out test set. Pick the $\kappa$ that maximises out-of-sample Sharpe.</p>
+
+<h3>Exercise E: Box vs ellipsoidal</h3>
+<p>Implement both. Compare the resulting weights and frontiers. Box is more conservative.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>When should you prefer robust over Bayesian, and vice versa?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise A to use box uncertainty: each $\mu_i$ varies in $[\hat \mu_i - \delta_i, \hat \mu_i + \delta_i]$. The robust counterpart adds a $\sum_i \delta_i |w_i|$ penalty.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For $\kappa = 1.0$, $\hat \mu = (0.08, 0.04)$, $\sigma = (0.15, 0.05)$, $\rho = -0.2$, $\lambda = 5$, $\Theta = \Sigma$, compute the robust weights vs nominal MV weights. The robust weights should be closer to equal weight.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_11_black_litterman.html">← Lesson 11</a></span>
+  <span><a href="lesson_13_covariance.html">Next: Lesson 13, Covariance estimation →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 4;
+const mu = [0.08, 0.04, 0.06, 0.10];
+const sigma_v = [0.15, 0.05, 0.18, 0.20];
+const rho = [[1.0, -0.2, 0.1, 0.7], [-0.2, 1.0, 0.0, -0.1], [0.1, 0.0, 1.0, 0.2], [0.7, -0.1, 0.2, 1.0]];
+const Sigma = [];
+for (let i = 0; i < N; i++) { const r = []; for (let j = 0; j < N; j++) r.push(sigma_v[i] * sigma_v[j] * rho[i][j]); Sigma.push(r); }
+
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+function robustMV(kappa, lam) {
+  // Projected gradient descent on max mu' w - kappa sqrt(w' Sigma w) - (lam/2) w' Sigma w s.t. sum w = 1
+  let w = mu.map(() => 1 / N);
+  const lr = 0.01;
+  for (let it = 0; it < 2000; it++) {
+    const Sw = matVec(Sigma, w);
+    const norm_w = Math.sqrt(Math.max(dot(w, Sw), 1e-10));
+    const grad = mu.map((m, i) => m - kappa * Sw[i] / norm_w - lam * Sw[i]);
+    w = w.map((wi, i) => wi + lr * grad[i]);
+    const s = w.reduce((a, b) => a + b, 0);
+    if (Math.abs(s) > 1e-9) w = w.map(x => x / s);
+  }
+  return w;
+}
+
+function update12() {
+  const kappa = parseFloat(document.getElementById('kappa').value);
+  const lam = parseFloat(document.getElementById('lam').value);
+  document.getElementById('kappa_v').textContent = kappa.toFixed(2);
+  document.getElementById('lam_v').textContent = lam.toFixed(1);
+
+  const w_nom = robustMV(0, lam);
+  const w_rob = robustMV(kappa, lam);
+  const m_nom = dot(w_nom, mu);
+  const v_nom = dot(w_nom, matVec(Sigma, w_nom));
+  const m_rob = dot(w_rob, mu);
+  const v_rob = dot(w_rob, matVec(Sigma, w_rob));
+
+  document.getElementById('nom_sr').textContent = (m_nom / Math.sqrt(v_nom)).toFixed(3);
+  document.getElementById('rob_sr').textContent = (m_rob / Math.sqrt(v_rob)).toFixed(3);
+  document.getElementById('conc').textContent = (Math.max(...w_rob) * 100).toFixed(1) + '%';
+  // Effective N from entropy
+  let H = 0;
+  for (const wi of w_rob) if (wi > 1e-9) H -= wi * Math.log(wi);
+  document.getElementById('enb').textContent = Math.exp(H).toFixed(2);
+
+  Plotly.react('robust_plot', [
+    { x: ['SPY', 'AGG', 'GLD', 'EM'], y: w_nom.map(x => x * 100), type: 'bar', name: 'Nominal MV', marker: { color: '#cbd5e0' } },
+    { x: ['SPY', 'AGG', 'GLD', 'EM'], y: w_rob.map(x => x * 100), type: 'bar', name: 'Robust MV', marker: { color: '#2b6cb0' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Weight (%)' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['kappa', 'lam'].forEach(id => document.getElementById(id).addEventListener('input', update12));
+update12();
+</script>
+</body>
+</html>

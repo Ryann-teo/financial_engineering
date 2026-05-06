@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 15: Hierarchical Risk Parity</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 15: Hierarchical Risk Parity</h1>
+<p class="subtitle">Module D, Week 5, Lesson 15. Cluster the universe by correlation, then allocate top-down without inverting the covariance matrix. Robust to noisy $\Sigma$.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Why no inverse: the HRP motivation</a></li>
+    <li><a href="#s2">Step 1: distance from correlation</a></li>
+    <li><a href="#s3">Step 2: hierarchical clustering</a></li>
+    <li><a href="#s4">Step 3: quasi-diagonalisation</a></li>
+    <li><a href="#s5">Step 4: recursive bisection</a></li>
+    <li><a href="#s6">Comparison: HRP vs ERC vs min-var</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Linkage method</h3>
+<p>Single (nearest neighbour), complete (farthest), average, Ward (variance-minimising). Each produces a different dendrogram, hence different HRP weights.</p>
+<h3>Block strength</h3>
+<p>How clustered the universe is. With strong block structure, HRP exploits the hierarchy. With uniform correlation, HRP looks like inverse-vol.</p>
+<h3>Noise level</h3>
+<p>Add Gaussian noise to the correlation matrix. Watch how HRP weights stay stable while min-var weights jump.</p>
+
+<h2 id="s1">1. Why no inverse?</h2>
+<p>Lesson 9 showed that $\Sigma^{-1}$ amplifies estimation error. ERC requires solving $\Sigma w = $ something nonlinear. Min-var requires $\Sigma^{-1} \mathbf{1}$. Both depend on inverting $\Sigma$.</p>
+<p>HRP (Lopez de Prado, 2016) sidesteps this entirely. It uses correlation distances and inverse variance only on the diagonal. No matrix inversion. Robust to noise in $\Sigma$.</p>
+
+<h2 id="s2">2. Step 1: distance from correlation</h2>
+<div class="formula">$$d(i, j) = \sqrt{(1 - \rho_{ij}) / 2}$$</div>
+<p>Properties: $d \in [0, 1]$. $\rho = 1 \Rightarrow d = 0$. $\rho = -1 \Rightarrow d = 1$. $d$ is a true metric on the asset space (satisfies triangle inequality). The choice $\sqrt{(1 - \rho)/2}$ is from chord distance on the unit sphere.</p>
+
+<h2 id="s3">3. Step 2: hierarchical clustering</h2>
+<p>Standard agglomerative clustering. Start with $N$ singleton clusters. Repeatedly merge the two closest clusters. Distance between clusters is the linkage choice:</p>
+<ul>
+  <li>Single: minimum pairwise distance.</li>
+  <li>Complete: maximum pairwise distance.</li>
+  <li>Average: mean pairwise distance.</li>
+  <li>Ward: minimise within-cluster variance increase.</li>
+</ul>
+<p>Output: a binary tree (dendrogram). Leaves are assets. Internal nodes are clusters.</p>
+
+<h2 id="s4">4. Step 3: quasi-diagonalisation</h2>
+<p>Reorder the correlation matrix so that highly correlated assets sit next to each other. The reorder is given by walking the dendrogram in some traversal order (typically depth-first). The resulting matrix has high values clustered along the diagonal.</p>
+
+<h2 id="s5">5. Step 4: recursive bisection</h2>
+<p>Now the magic. Walk the dendrogram top-down. At each split, allocate weights between the two sub-clusters in inverse proportion to their cluster variances. The cluster variance for subset $S$ is the variance of the inverse-vol-weighted portfolio within $S$.</p>
+<pre><code>def hrp_weights(returns):
+    Sigma = returns.cov()
+    corr = returns.corr()
+    dist = np.sqrt((1 - corr) / 2)
+    link = scipy.cluster.hierarchy.linkage(squareform(dist), method='single')
+    sort_ix = quasi_diag(link)
+    Sigma_sorted = Sigma.iloc[sort_ix, sort_ix]
+    return recursive_bisection(Sigma_sorted)</code></pre>
+
+<h3>Live: HRP visualisation</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Block strength: <span class="value" id="blk_v">0.7</span></label>
+      <input type="range" id="blk" min="0.0" max="0.95" step="0.05" value="0.7">
+    </div>
+    <div class="control">
+      <label>Noise level: <span class="value" id="noise_v">0.05</span></label>
+      <input type="range" id="noise" min="0.0" max="0.30" step="0.01" value="0.05">
+    </div>
+    <div class="control">
+      <label>Method: <span class="value" id="method_v">HRP</span></label>
+      <input type="range" id="method" min="0" max="2" step="1" value="0">
+    </div>
+  </div>
+  <div id="hrp_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Portfolio vol (estimated)</span><span class="stat-value" id="vol_est">0</span></div>
+    <div class="stat"><span>Portfolio vol (true)</span><span class="stat-value" id="vol_true">0</span></div>
+    <div class="stat"><span>Largest weight</span><span class="stat-value" id="max_w">0</span></div>
+    <div class="stat"><span>Effective N (entropy)</span><span class="stat-value" id="enb">0</span></div>
+  </div>
+</div>
+
+<h2 id="s6">6. HRP vs ERC vs min-var</h2>
+<p>Bootstrap study (Lopez de Prado 2016): with 200 noisy bootstraps of correlation, HRP weights have the smallest standard deviation. ERC weights are more stable than min-var, but less than HRP. The reason: HRP's recursive bisection touches each pair of correlations only once, in the cluster split that determines them. Noise in distant correlations does not affect a leaf's weight much.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 121):</strong> Article 121 ("Machine learning for portfolio diversification") explores HRP and related clustering-based allocation. Macrosynergy adopts the HRP idea (avoid inversion) more conservatively: equal-weight signals within a theme, equal-weight themes across an asset, equal-weight assets across a strategy. The hierarchical structure is imposed by economic logic rather than learned from correlations. Same robustness, more interpretable.
+</div>
+
+<h2 id="s_math">7. Mathematical companion</h2>
+<h3>7.1 Why $\sqrt{(1 - \rho)/2}$ is a true metric</h3>
+<p>Define $u_i$ as an asset's return vector standardised. Then $\langle u_i, u_j \rangle = \rho_{ij}$. The Euclidean chord distance is $\|u_i - u_j\|^2 = 2 - 2 \rho_{ij}$. Take the square root and divide by 2: that is the HRP distance. Triangle inequality follows from triangle inequality of Euclidean distance.</p>
+<h3>7.2 Recursive bisection variance allocation</h3>
+<p>For two sub-clusters $L$ and $R$ with cluster vols $\sigma_L$ and $\sigma_R$, allocate $\alpha_L = \sigma_R^2 / (\sigma_L^2 + \sigma_R^2)$ to $L$ and $\alpha_R = 1 - \alpha_L$. This is the inverse-variance weight that ignores the correlation between $L$ and $R$. The "ignoring" is the source of HRP's robustness: cross-cluster correlation noise has no effect.</p>
+<h3>7.3 Convergence and complexity</h3>
+<p>Clustering is $O(N^3)$ for naive implementations, $O(N^2 \log N)$ with Ward or single linkage. Quasi-diagonalisation is $O(N)$ given the linkage. Recursive bisection is $O(N \log N)$. Total: $O(N^3)$ dominated by clustering.</p>
+<h3>7.4 HERC (Hierarchical Equal Risk Contribution)</h3>
+<p>Raffinot (2018) variant: at each tree node, allocate to maximise diversification ratio rather than inverse cluster variance. Often gives smoother weights. Now common in production systems.</p>
+<h3>7.5 NCO (Nested Clustered Optimisation)</h3>
+<p>Lopez de Prado (2020) follow-up: cluster, then within each cluster run min-var, then between clusters run min-var on cluster portfolios. Combines hierarchical structure with optimisation. Best of both.</p>
+
+<h2 id="s_code">8. Coding exercises (extras)</h2>
+<h3>Exercise A: HRP from scratch</h3>
+<p>Implement the four steps using <code>scipy.cluster.hierarchy</code> and a recursive bisection function. Reference: Lopez de Prado (2016).</p>
+<h3>Exercise B: HRP with mlfinlab</h3>
+<pre><code>from mlfinlab.portfolio_optimization import HierarchicalRiskParity
+hrp = HierarchicalRiskParity()
+hrp.allocate(asset_returns=returns)
+weights = hrp.weights</code></pre>
+<h3>Exercise C: Stability test</h3>
+<p>Bootstrap the data 200 times. Compare standard deviation of HRP, ERC, and min-var weights. HRP should win.</p>
+<h3>Exercise D: Linkage choice ablation</h3>
+<p>Run HRP under all four linkages. Compare weights. Single linkage is most aggressive; Ward is most conservative.</p>
+<h3>Exercise E: HERC variant</h3>
+<p>Modify HRP to use diversification-ratio-maximising splits at each node. Compare to vanilla HRP.</p>
+
+<h2 id="s_test">9. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does HRP not need to invert $\Sigma$? Trace through the four steps and identify where matrix inversion would be required if you were doing min-var.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify the recursive bisection to accept a maximum weight constraint $w_i \le 0.30$. Hint: clip after the bisection split, then renormalise within the cluster.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For two assets with $\sigma = (0.20, 0.10)$ and $\rho = 0.5$, the HRP allocation is the inverse-variance split. Compute the weights by hand. Compare with min-var.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_14_erc.html">← Lesson 14</a></span>
+  <span><a href="lesson_16_cvar_drawdown.html">Next: Lesson 16, CVaR and drawdown →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 8;
+const asset_names = ['SPY','QQQ','EFA','EEM','AGG','TLT','GLD','SLV'];
+const sigma_v = [0.16, 0.20, 0.18, 0.22, 0.06, 0.08, 0.16, 0.20];
+// Block structure: equity (0-3), bonds (4-5), metals (6-7)
+function makeCorr(blk, noise, seed) {
+  let s = seed;
+  function rand() { s = (s * 9301 + 49297) % 233280; return s / 233280 - 0.5; }
+  const C = Array.from({length: N}, () => new Array(N).fill(0));
+  for (let i = 0; i < N; i++) C[i][i] = 1;
+  const block = [0,0,0,0,1,1,2,2];
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+    const baseRho = block[i] === block[j] ? blk : 0.1 * blk;
+    const r = baseRho + 2 * noise * rand();
+    C[i][j] = C[j][i] = Math.max(-0.95, Math.min(0.95, r));
+  }
+  return C;
+}
+function corrToSigma(C) {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(sigma_v[i] * sigma_v[j] * C[i][j]);
+    S.push(r);
+  }
+  return S;
+}
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+function hrp(C) {
+  // Distance
+  const D = C.map(row => row.map(c => Math.sqrt((1 - c) / 2)));
+  // Single-linkage clustering
+  let clusters = Array.from({length: N}, (_, i) => [i]);
+  while (clusters.length > 1) {
+    let bestI = 0, bestJ = 1, bestD = Infinity;
+    for (let i = 0; i < clusters.length; i++) for (let j = i + 1; j < clusters.length; j++) {
+      let d = Infinity;
+      for (const a of clusters[i]) for (const b of clusters[j]) d = Math.min(d, D[a][b]);
+      if (d < bestD) { bestD = d; bestI = i; bestJ = j; }
+    }
+    const merged = clusters[bestI].concat(clusters[bestJ]);
+    clusters = clusters.filter((_, k) => k !== bestI && k !== bestJ);
+    clusters.push(merged);
+  }
+  const order = clusters[0];
+  // Recursive bisection
+  function clusterVar(items) {
+    const ivp = items.map(i => 1 / Math.pow(sigma_v[i], 2));
+    const sumIvp = ivp.reduce((a, b) => a + b, 0);
+    const w = ivp.map(x => x / sumIvp);
+    let v = 0;
+    for (let i = 0; i < items.length; i++) for (let j = 0; j < items.length; j++) {
+      v += w[i] * w[j] * sigma_v[items[i]] * sigma_v[items[j]] * C[items[i]][items[j]];
+    }
+    return v;
+  }
+  const weights = new Array(N).fill(0);
+  function recurse(items, weight) {
+    if (items.length === 1) { weights[items[0]] = weight; return; }
+    const mid = Math.floor(items.length / 2);
+    const left = items.slice(0, mid), right = items.slice(mid);
+    const vL = clusterVar(left), vR = clusterVar(right);
+    const alpha = vR / (vL + vR);
+    recurse(left, weight * alpha);
+    recurse(right, weight * (1 - alpha));
+  }
+  recurse(order, 1);
+  return weights;
+}
+
+function ercSimple(Sigma) {
+  let w = new Array(N).fill(1 / N);
+  for (let it = 0; it < 2000; it++) {
+    let changed = 0;
+    for (let i = 0; i < N; i++) {
+      const Sw = matVec(Sigma, w);
+      const num = Sw[i] - Sigma[i][i] * w[i];
+      const totalVar = dot(w, Sw);
+      const disc = num * num + 4 * Sigma[i][i] * (1 / N) * totalVar;
+      const new_wi = (-num + Math.sqrt(Math.max(disc, 0))) / (2 * Sigma[i][i]);
+      changed = Math.max(changed, Math.abs(new_wi - w[i]));
+      w[i] = new_wi;
+    }
+    const s = w.reduce((a, b) => a + b, 0);
+    if (Math.abs(s) > 1e-9) w = w.map(x => x / s);
+    if (changed < 1e-9) break;
+  }
+  return w;
+}
+
+function update15() {
+  const blk = parseFloat(document.getElementById('blk').value);
+  const noise = parseFloat(document.getElementById('noise').value);
+  const method = parseInt(document.getElementById('method').value);
+  const methodName = ['HRP', 'ERC', 'Inverse vol'][method];
+  document.getElementById('blk_v').textContent = blk.toFixed(2);
+  document.getElementById('noise_v').textContent = noise.toFixed(2);
+  document.getElementById('method_v').textContent = methodName;
+
+  const C_obs = makeCorr(blk, noise, 42);
+  const C_true = makeCorr(blk, 0, 42);
+  const Sigma_obs = corrToSigma(C_obs);
+  const Sigma_true = corrToSigma(C_true);
+
+  let w;
+  if (method === 0) w = hrp(C_obs);
+  else if (method === 1) w = ercSimple(Sigma_obs);
+  else {
+    const ivp = sigma_v.map(s => 1 / s);
+    const t = ivp.reduce((a, b) => a + b, 0);
+    w = ivp.map(x => x / t);
+  }
+
+  const vol_est = Math.sqrt(dot(w, matVec(Sigma_obs, w)));
+  const vol_true = Math.sqrt(dot(w, matVec(Sigma_true, w)));
+  let H = 0;
+  for (const wi of w) if (wi > 1e-9) H -= wi * Math.log(wi);
+
+  document.getElementById('vol_est').textContent = (vol_est * 100).toFixed(2) + '%';
+  document.getElementById('vol_true').textContent = (vol_true * 100).toFixed(2) + '%';
+  document.getElementById('max_w').textContent = (Math.max(...w) * 100).toFixed(1) + '%';
+  document.getElementById('enb').textContent = Math.exp(H).toFixed(2);
+
+  Plotly.react('hrp_plot', [
+    { x: asset_names, y: w.map(x => x * 100), type: 'bar', name: methodName + ' weights', marker: { color: '#2b6cb0' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    yaxis: { title: 'Weight (%)' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['blk', 'noise', 'method'].forEach(id => document.getElementById(id).addEventListener('input', update15));
+update15();
+</script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 14: Equal Risk Contribution and Risk Parity</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 14: Equal Risk Contribution and Risk Parity</h1>
+<p class="subtitle">Module D, Week 5, Lesson 14. Each asset contributes equally to portfolio variance. The most popular non-Markowitz allocation framework.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">From risk budgeting (Lesson 7) to ERC</a></li>
+    <li><a href="#s2">The Spinu convex form</a></li>
+    <li><a href="#s3">Cyclical coordinate descent algorithm</a></li>
+    <li><a href="#s4">Risk parity in practice and the leverage problem</a></li>
+    <li><a href="#s5">Macro-aware risk parity</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Vol heterogeneity</h3>
+<p>Slide between assets with similar volatilities and assets with very different volatilities. ERC weights respond inversely to vol, but adjust for correlations.</p>
+<h3>Correlation</h3>
+<p>The cross-asset correlation. ERC behaves differently in low vs high correlation regimes.</p>
+<h3>Macro tilt strength</h3>
+<p>Lets you bias the risk budget toward "growth" or "defensive" assets based on a macro signal.</p>
+
+<h2 id="s1">1. From risk budgeting to ERC</h2>
+<p>In Lesson 7 we learned the Euler decomposition: $\sigma_p = \sum_i \text{RC}_i$. ERC is the special case where all $\text{RC}_i$ are equal:</p>
+<div class="formula">$$\frac{w_i (\Sigma w)_i}{\sigma_p} = \frac{1}{N} \sigma_p \quad \forall i$$</div>
+<p>Equivalently: $w_i (\Sigma w)_i = w_j (\Sigma w)_j$ for all $i, j$. This is a system of $N$ nonlinear equations.</p>
+
+<h2 id="s2">2. The Spinu convex form</h2>
+<p>Spinu (2013) proved the equivalent convex problem:</p>
+<div class="formula">$$\min_{w > 0} \tfrac{1}{2} w^\top \Sigma w - \frac{1}{N} \sum_{i=1}^N \log w_i$$</div>
+<p>The log barrier ensures positive weights. The first-order conditions match the ERC equations exactly. Standard convex solvers (cvxpy with `cp.log`) handle this in 5 lines.</p>
+<p>Maillard, Roncalli, and Teiletche (2010) proved existence and uniqueness under positivity. Each ERC problem has exactly one solution.</p>
+
+<h2 id="s3">3. Cyclical coordinate descent</h2>
+<p>Faster than convex solvers for ERC: at each step, fix all $w_j$ except $w_i$, solve a 1D quadratic for $w_i$. The 1D update has closed form. Iterate until $\|w - w_{\text{old}}\| < \text{tol}$. Converges in 10 to 50 iterations.</p>
+<pre><code>def erc_ccd(Sigma, max_iter=1000, tol=1e-9):
+    n = Sigma.shape[0]
+    w = np.ones(n) / n
+    for _ in range(max_iter):
+        w_old = w.copy()
+        for i in range(n):
+            num = (Sigma @ w)[i] - Sigma[i, i] * w[i]
+            disc = num ** 2 + 4 * Sigma[i, i] * (1 / n) * (w @ Sigma @ w)
+            w[i] = (-num + np.sqrt(disc)) / (2 * Sigma[i, i])
+        w = w / w.sum()
+        if np.linalg.norm(w - w_old) < tol: break
+    return w</code></pre>
+
+<h3>Live: ERC explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Vol heterogeneity: <span class="value" id="het_v">1.0</span></label>
+      <input type="range" id="het" min="0.5" max="3" step="0.1" value="1.0">
+    </div>
+    <div class="control">
+      <label>Average correlation: <span class="value" id="rho_v">0.30</span></label>
+      <input type="range" id="rho" min="-0.5" max="0.9" step="0.05" value="0.30">
+    </div>
+  </div>
+  <div id="erc_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Portfolio vol</span><span class="stat-value" id="vol">0</span></div>
+    <div class="stat"><span>Diversification ratio</span><span class="stat-value" id="dr">0</span></div>
+    <div class="stat"><span>Largest weight</span><span class="stat-value" id="max_w">0</span></div>
+    <div class="stat"><span>RC max minus min (should be 0)</span><span class="stat-value" id="rc_diff">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Crank vol heterogeneity to 3.0.</strong> The lowest-vol asset dominates the weights (could be 60%+). Yet the risk shares stay equal. ERC equalises risk, not capital.
+</div>
+
+<h2 id="s4">4. Risk parity in practice</h2>
+<p>Risk parity is a portfolio strategy built on ERC across asset classes. The classic implementation: 25% equity risk, 25% bond risk, 25% commodity risk, 25% gold risk. To match equity-only Sharpe, leverage 1.5x to 2x is needed because the unlevered portfolio is too low-risk.</p>
+<p><strong>The leverage problem.</strong> Borrowing costs above the risk-free rate eat into the Sharpe gain. Asness, Frazzini, Pedersen (2012) show risk parity still beats 60/40 after realistic borrowing costs. The 2022 inflation shock hurt risk parity disproportionately because both bonds and equities sold off.</p>
+
+<h2 id="s5">5. Macro-aware risk parity</h2>
+<p>Plain ERC ignores expected returns and macro context. Macrosynergy art 23 and 88 propose "macro-aware risk parity": tilt the risk budget by macro signals. Examples:</p>
+<ul>
+  <li>If the macro signal favours growth assets (low real rates, expanding PMI), tilt risk toward equities.</li>
+  <li>If inflation accelerating, tilt risk toward commodities and away from nominal bonds.</li>
+</ul>
+<p>The implementation is a risk-budgeting problem (Lesson 7) with non-uniform $b$ derived from macro factors. Sharpe improves from ~0.8 (plain ERC) to ~1.3 in the cross-asset case (art 23).</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 23, 88, 285):</strong> Macrosynergy uses ERC as the baseline and adds macro factor tilts as the alpha. Article 285 applies this to cross-country bond allocation. The structure is "two-fund": fund A is the risk-balanced book (ERC), fund B is the macro overlay. This is a clean separation between risk allocation and return prediction. Most MS systematic products use this structure.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Why Spinu's log barrier works</h3>
+<p>The first-order condition $\partial \mathcal{L} / \partial w_i = (\Sigma w)_i - 1 / (N w_i) = 0$ rearranges to $w_i (\Sigma w)_i = 1/N$. Sum over $i$: total risk equals $\sum_i 1/N = 1$, scaled by $w^\top \Sigma w = $ portfolio variance. So all asset risks equal $1/N$ of total. Multiply through by $w^\top \Sigma w$ and you get the ERC condition.</p>
+<h3>6.2 Existence and uniqueness</h3>
+<p>The Spinu objective is convex. The log barrier forces $w_i > 0$. The objective is coercive (goes to infinity at the boundary). Therefore a unique global minimum exists.</p>
+<h3>6.3 Risk parity Sharpe vs 60/40 Sharpe</h3>
+<p>If all assets had the same Sharpe and were uncorrelated, ERC = inverse-vol weight, and the portfolio Sharpe equals individual asset Sharpe. With correlations, ERC Sharpe is bounded above by the most-correlated-asset Sharpe.</p>
+<h3>6.4 The leverage cost arithmetic</h3>
+<p>Levered Sharpe = unlevered Sharpe minus (financing rate above risk-free) divided by vol. For 1.5x leverage at 1% above risk-free: cost = 0.5% / vol. At 10% vol, cost = 5 bp Sharpe. Modest.</p>
+<h3>6.5 Macro tilt as a risk budget perturbation</h3>
+<p>If $b_i^{\text{macro}}$ is the tilted budget, solve $w_i (\Sigma w)_i = b_i^{\text{macro}} (w^\top \Sigma w)$. The Spinu objective generalises to $\tfrac{1}{2} w^\top \Sigma w - \sum_i b_i^{\text{macro}} \log w_i$. Same algorithm with $1/N$ replaced by $b_i^{\text{macro}}$.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: ERC with cvxpy</h3>
+<pre><code>import cvxpy as cp
+def erc_cvxpy(Sigma, b=None):
+    n = Sigma.shape[0]
+    if b is None: b = np.ones(n) / n
+    w = cp.Variable(n, pos=True)
+    obj = cp.Minimize(0.5 * cp.quad_form(w, Sigma) - b @ cp.log(w))
+    cp.Problem(obj).solve()
+    return w.value / w.value.sum()</code></pre>
+<h3>Exercise B: ERC by CCD</h3>
+<p>Implement the cyclical coordinate descent. Verify the result matches Exercise A.</p>
+<h3>Exercise C: Macro-aware ERC</h3>
+<p>Build a 5-asset ERC with macro tilts: equity 30%, bond 30%, commodity 20%, gold 10%, EM equity 10%. Compare to plain ERC.</p>
+<h3>Exercise D: Backtest risk parity</h3>
+<p>Compare 60/40, equal weight, ERC, ERC with 1.5x leverage. Use the synthetic data from Lesson 13. Report Sharpe and drawdown.</p>
+<h3>Exercise E: Macro tilt by inflation regime</h3>
+<p>Use the inflation z-score (synthetic) as the macro signal. Tilt commodities up when inflation is high, bonds up when low. Backtest.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why is "60/40 in risk space" actually closer to 97/3? Hint: see Lesson 7 self test 1.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify ERC by CCD to add a maximum weight constraint $w_i \le 0.30$. Hint: clip after each coordinate update.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For three assets with $\sigma = (0.20, 0.10, 0.05)$ and zero correlation, compute the ERC weights by hand. Hint: $w_i \propto 1 / \sigma_i$ when correlations are zero.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_13_covariance.html">← Lesson 13</a></span>
+  <span><a href="lesson_15_hrp.html">Next: Lesson 15, Hierarchical Risk Parity →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 5;
+const asset_names = ['Equity', 'Bond', 'Gold', 'EM', 'Commod'];
+const base_sigma = [0.18, 0.06, 0.16, 0.22, 0.20];
+
+function buildSigma(het, rho) {
+  const adj = base_sigma.map((s, i) => s * Math.pow(het, (i - 2) / 2));
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(adj[i] * adj[j] * (i === j ? 1 : rho));
+    S.push(r);
+  }
+  return S;
+}
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+function ercCCD(Sigma) {
+  let w = new Array(N).fill(1 / N);
+  for (let it = 0; it < 5000; it++) {
+    let changed = 0;
+    for (let i = 0; i < N; i++) {
+      const Sw = matVec(Sigma, w);
+      const num = Sw[i] - Sigma[i][i] * w[i];
+      const totalVar = dot(w, Sw);
+      const disc = num * num + 4 * Sigma[i][i] * (1 / N) * totalVar;
+      const new_wi = (-num + Math.sqrt(Math.max(disc, 0))) / (2 * Sigma[i][i]);
+      changed = Math.max(changed, Math.abs(new_wi - w[i]));
+      w[i] = new_wi;
+    }
+    const s = w.reduce((a, b) => a + b, 0);
+    if (Math.abs(s) > 1e-9) w = w.map(x => x / s);
+    if (changed < 1e-9) break;
+  }
+  return w;
+}
+
+function update14() {
+  const het = parseFloat(document.getElementById('het').value);
+  const rho = parseFloat(document.getElementById('rho').value);
+  document.getElementById('het_v').textContent = het.toFixed(2);
+  document.getElementById('rho_v').textContent = rho.toFixed(2);
+
+  const Sigma = buildSigma(het, rho);
+  const w = ercCCD(Sigma);
+  const Sw = matVec(Sigma, w);
+  const totalVar = dot(w, Sw);
+  const sigma_p = Math.sqrt(totalVar);
+  const rc = w.map((wi, i) => wi * Sw[i] / sigma_p);
+  const rc_share = rc.map(x => x / sigma_p * 100);
+  const sigmas_curr = base_sigma.map((s, i) => s * Math.pow(het, (i - 2) / 2));
+  const dr = dot(w, sigmas_curr) / sigma_p;
+
+  document.getElementById('vol').textContent = (sigma_p * 100).toFixed(2) + '%';
+  document.getElementById('dr').textContent = dr.toFixed(2);
+  document.getElementById('max_w').textContent = (Math.max(...w) * 100).toFixed(1) + '%';
+  document.getElementById('rc_diff').textContent = (Math.max(...rc_share) - Math.min(...rc_share)).toFixed(2) + ' pp';
+
+  Plotly.react('erc_plot', [
+    { x: asset_names, y: w.map(x => x * 100), type: 'bar', name: 'Weights (%)', marker: { color: '#2b6cb0' } },
+    { x: asset_names, y: rc_share, type: 'bar', name: 'Risk shares (%)', marker: { color: '#c05621' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Percent' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['het', 'rho'].forEach(id => document.getElementById(id).addEventListener('input', update14));
+update14();
+</script>
+</body>
+</html>

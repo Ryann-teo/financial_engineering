@@ -11,6 +11,14 @@ Three interactive dashboards covering Week 1 of the Portfolio Construction curri
 | `lesson_06_kkt_constraints.html`        | 6 | KKT, constraints, and the convex programming workflow |
 | `lesson_07_risk_budgeting.html`         | 7 | Risk budgeting and the Euler decomposition |
 | `lesson_08_sharpe_statistics.html`      | 8 | Sharpe statistics and the Deflated Sharpe Ratio |
+| `lesson_09_why_mv_breaks.html`          | 9 | Why mean-variance fails out of sample |
+| `lesson_10_shrinkage.html`              | 10 | Shrinkage and Bayesian estimation |
+| `lesson_11_black_litterman.html`        | 11 | Black-Litterman master formula |
+| `lesson_12_robust.html`                 | 12 | Robust optimisation, ellipsoidal SOCP |
+| `lesson_13_covariance.html`             | 13 | Covariance estimation in depth |
+| `lesson_14_erc.html`                    | 14 | Equal Risk Contribution and risk parity |
+| `lesson_15_hrp.html`                    | 15 | Hierarchical Risk Parity |
+| `lesson_16_cvar_drawdown.html`          | 16 | CVaR and drawdown optimisation |
 | `module_a_exercises.ipynb`              | A | 30 fill-in-the-blank coding exercises (10 per lesson + 3 bonuses) |
 | `lessons_09_to_30_outline.md`           | - | Build queue for the remaining 22 lessons |
 

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 11: Black-Litterman</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 11: Black-Litterman</h1>
+<p class="subtitle">Module C, Week 4, Lesson 11. Start from market equilibrium, blend in views with confidence weights, get a posterior that does not blow up the portfolio.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Reverse optimisation: the equilibrium prior</a></li>
+    <li><a href="#s2">Encoding views: P, Q, $\Omega$</a></li>
+    <li><a href="#s3">The master formula</a></li>
+    <li><a href="#s4">$\tau$, $\Omega$, and confidence calibration</a></li>
+    <li><a href="#s5">Practical pitfalls</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Market cap weights</h3>
+<p>The starting point. BL assumes the market portfolio is held by a representative investor in equilibrium. Realistic market caps for global asset classes: equity 60%, bonds 30%, alternatives 10%, with sub-allocations.</p>
+<h3>Risk aversion $\lambda$</h3>
+<p>The implicit risk aversion of the representative market investor. Default: $\lambda = 2.5$, calibrated to historical equity Sharpe.</p>
+<h3>$\tau$</h3>
+<p>The "prior strength" parameter. Smaller $\tau$ means a tighter prior on equilibrium returns. Common values: 0.025 (one over the sample size, $\approx 1/T$) to 0.05.</p>
+<h3>View return and confidence</h3>
+<p>For each view, the expected return and the confidence (low, medium, high). High confidence means low $\Omega$, so the view dominates the prior. Low confidence means high $\Omega$, so the prior dominates.</p>
+
+<h2 id="s1">1. Reverse optimisation: the equilibrium prior</h2>
+<p>Markowitz tells us how to compute optimal weights given $\mu$ and $\Sigma$. Reverse it: given that the market holds weights $w_m$, what $\mu$ would make this optimal?</p>
+<div class="formula">$$\Pi = \lambda \Sigma w_m$$</div>
+<p>$\Pi$ is the vector of "implied equilibrium returns". This is the prior in BL. It is automatically internally consistent: if you optimise on $\Pi$ you get back $w_m$. No estimation, just algebra.</p>
+
+<h2 id="s2">2. Encoding views</h2>
+<p>A view in BL is a linear belief about the assets: $P \mu = Q + \epsilon$, $\epsilon \sim N(0, \Omega)$. Two flavours:</p>
+<p><strong>Absolute view.</strong> "I think US equities will return 5%". $P = (1, 0, 0, \ldots)$, $Q = 0.05$.</p>
+<p><strong>Relative view.</strong> "I think Europe will outperform US by 2%". $P = (-1, 1, 0, \ldots)$, $Q = 0.02$.</p>
+<p>$\Omega$ is the diagonal matrix of view variances. Smaller diagonal entry means higher confidence. Typically calibrated as $\Omega_{kk} = \tau \cdot p_k^\top \Sigma p_k$ scaled by a confidence multiplier.</p>
+
+<h2 id="s3">3. The master formula</h2>
+<p>The posterior mean of $\mu$ given the equilibrium prior and views is</p>
+<div class="formula">$$\mu_{BL} = \left[(\tau \Sigma)^{-1} + P^\top \Omega^{-1} P\right]^{-1} \left[(\tau \Sigma)^{-1} \Pi + P^\top \Omega^{-1} Q\right]$$</div>
+<p>The structure is: combine two precision-weighted means. The equilibrium prior contributes $(\tau \Sigma)^{-1} \Pi$. The views contribute $P^\top \Omega^{-1} Q$. The denominator is the combined precision.</p>
+
+<p>Plug $\mu_{BL}$ back into Markowitz to get the BL portfolio. The result has weights that are tilts away from $w_m$, in the direction of the views, scaled by view confidence.</p>
+
+<h3>Live: BL view encoder</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>$\tau$ (prior strength): <span class="value" id="tau_v">0.05</span></label>
+      <input type="range" id="tau" min="0.01" max="0.20" step="0.01" value="0.05">
+    </div>
+    <div class="control">
+      <label>View on US equity (annual): <span class="value" id="view_v">5%</span></label>
+      <input type="range" id="view" min="-5" max="15" step="0.5" value="5">
+    </div>
+    <div class="control">
+      <label>View confidence: <span class="value" id="conf_v">medium</span></label>
+      <input type="range" id="conf" min="0" max="2" step="1" value="1">
+    </div>
+  </div>
+  <div id="bl_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Equilibrium return on US equity</span><span class="stat-value" id="eq_ret">0</span></div>
+    <div class="stat"><span>Posterior return on US equity</span><span class="stat-value" id="post_ret">0</span></div>
+    <div class="stat"><span>Posterior weight shift</span><span class="stat-value" id="weight_shift">0</span></div>
+    <div class="stat"><span>Tracking error vs market</span><span class="stat-value" id="te">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Drag the view to 10% with low confidence.</strong> The posterior US equity return barely moves from equilibrium. Now switch to high confidence: the posterior collapses to your view. The whole game is calibrating $\Omega$.
+</div>
+
+<h2 id="s4">4. $\tau$, $\Omega$, and confidence calibration</h2>
+<p>$\tau$ scales the entire prior covariance. Smaller $\tau$ = stronger prior. Empirical default: $\tau = 1/T$ where $T$ is your effective sample size.</p>
+<p>$\Omega$ encodes view confidence. Three popular calibrations:</p>
+<ul>
+  <li><strong>Idzorek (2005):</strong> specify confidence as a percent (0 to 100%) and back out $\Omega$ such that the posterior weight shift matches.</li>
+  <li><strong>$\Omega = \tau P \Sigma P^\top$:</strong> set view variances proportional to the prior. Self-scaling.</li>
+  <li><strong>Manual:</strong> directly set $\Omega_{kk}$ in basis points squared. Most flexible, requires intuition.</li>
+</ul>
+
+<h2 id="s5">5. Practical pitfalls</h2>
+<p><strong>Inconsistent views.</strong> If two views are roughly contradictory (e.g. "US up 5%" and "global equities flat"), $P^\top \Omega^{-1} P$ may be ill-conditioned. Orthogonalise views before encoding.</p>
+<p><strong>Posterior covariance not always tighter.</strong> Some BL implementations forget to update $\Sigma$ as well. Default: $\Sigma_{BL} = \Sigma + ((\tau \Sigma)^{-1} + P^\top \Omega^{-1} P)^{-1}$.</p>
+<p><strong>Sensitivity to $\lambda$.</strong> The implied equilibrium returns scale linearly with $\lambda$. Pick $\lambda$ from historical Sharpe (typically 2 to 4 for global equity). Document your choice.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy):</strong> Macrosynergy does not use Black-Litterman directly. Their philosophical equivalent is conceptual parity: pin weights by economic justification (each macro factor gets equal risk budget), do not let the data move them. BL is closer to the "tactical asset allocation" practice at large institutions (Goldman, BlackRock, AQR for some products). Where MS sits is more like "build your alpha from macro signals, then equal-weight, never optimise". A useful synthesis: use BL to combine an equilibrium prior with a Macrosynergy macro signal as the view. The BL posterior gives you mean-shifts that respect both.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 The reverse optimisation derivation</h3>
+<p>Mean-variance solution: $w^\star = (\lambda \Sigma)^{-1} \mu$. Set $w^\star = w_m$ and solve for $\mu$: $\mu = \lambda \Sigma w_m = \Pi$. Done.</p>
+
+<h3>6.2 The master formula derivation</h3>
+<p>Treat $\mu \sim N(\Pi, \tau \Sigma)$ as the prior. The view equation $P \mu = Q$ has likelihood $N(P\mu, \Omega)$. Combine via Bayes' rule. The posterior mean is the precision-weighted average.</p>
+
+<h3>6.3 Why $\tau \Sigma$ instead of $\Sigma$ as the prior covariance</h3>
+<p>$\Sigma$ is the variance of returns, not of expected returns. The variance of the expected return is much smaller; we use $\tau \Sigma$ as a parametric guess at how uncertain we are about $\mu$. $\tau$ encodes "how many years of data is the prior worth" inversely.</p>
+
+<h3>6.4 The Idzorek confidence-to-$\Omega$ calibration</h3>
+<p>Pick a confidence $\alpha \in [0, 1]$. Set $\Omega$ such that the resulting posterior weight on view $k$'s "100% confidence" implementation matches a fraction $\alpha$ of the way from equilibrium to "100% view" weights. Closed form in Idzorek (2005).</p>
+
+<h3>6.5 Connection to Bayesian linear models</h3>
+<p>BL is exactly Bayesian linear regression with a normal-normal-normal model. The "data" is the views, the "parameter" is $\mu$, the "prior" is equilibrium. Standard conjugate update.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Reverse optimisation</h3>
+<pre><code>def equilibrium_returns(w_m, Sigma, lam=2.5):
+    return lam * Sigma @ w_m</code></pre>
+
+<h3>Exercise B: Master formula</h3>
+<pre><code>def black_litterman(Pi, Sigma, P, Q, Omega, tau=0.05):
+    tau_Sigma_inv = np.linalg.inv(tau * Sigma)
+    Omega_inv = np.linalg.inv(Omega)
+    A = tau_Sigma_inv + P.T @ Omega_inv @ P
+    b = tau_Sigma_inv @ Pi + P.T @ Omega_inv @ Q
+    return np.linalg.solve(A, b)</code></pre>
+
+<h3>Exercise C: Encode an absolute view</h3>
+<p>"US equities will return 6% annually". Build the appropriate $P$ and $Q$ for a 5-asset universe.</p>
+
+<h3>Exercise D: Encode a relative view</h3>
+<p>"European equities will outperform US equities by 2% annually". Build $P$ and $Q$.</p>
+
+<h3>Exercise E: Confidence sweep</h3>
+<p>For one view, sweep $\Omega$ from large (low confidence) to small (high confidence). Plot how the posterior $\mu$ moves from $\Pi$ to $Q$. Verify the limiting behaviour.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does BL avoid the error maximisation problem of plain Markowitz?</p>
+  <p><em>Answer:</em> The equilibrium prior anchors the optimisation. Without strong views, the BL portfolio is close to the market. Views shift the portfolio away from the market only in proportion to confidence. Estimation noise affects the prior weakly because the prior is constructed analytically (not estimated).</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Implement the full BL pipeline (reverse opt + master formula + Markowitz on the posterior). Test on a 3-asset universe with one absolute view at high confidence. Verify the posterior weight on the view asset moves toward the view's implied weight.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For $\tau = 0.05$, $\Omega = 0.02^2$, view return 5%, equilibrium return 6%, what is the posterior return? Use the 1D version of the master formula.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_10_shrinkage.html">← Lesson 10</a></span>
+  <span><a href="lesson_12_robust.html">Next: Lesson 12, Robust optimisation →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 5;
+const asset_names = ['US Eq', 'Intl Eq', 'AGG', 'EM', 'Gold'];
+const w_m = [0.45, 0.20, 0.20, 0.10, 0.05]; // approximate market caps
+const sigma_v = [0.16, 0.18, 0.06, 0.22, 0.16];
+const rho = [
+  [1.0, 0.7, -0.2, 0.6, 0.1],
+  [0.7, 1.0, -0.1, 0.7, 0.1],
+  [-0.2, -0.1, 1.0, -0.1, 0.0],
+  [0.6, 0.7, -0.1, 1.0, 0.1],
+  [0.1, 0.1, 0.0, 0.1, 1.0],
+];
+const Sigma = (() => {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(sigma_v[i] * sigma_v[j] * rho[i][j]);
+    S.push(r);
+  }
+  return S;
+})();
+
+function inv(A) {
+  const n = A.length;
+  const M = A.map((r, i) => r.concat(Array.from({length: n}, (_, j) => (i === j ? 1 : 0))));
+  for (let i = 0; i < n; i++) {
+    let p = M[i][i];
+    if (Math.abs(p) < 1e-12) for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > 1e-12) { [M[i], M[r]] = [M[r], M[i]]; p = M[i][i]; break; }
+    for (let j = 0; j < 2 * n; j++) M[i][j] /= p;
+    for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i]; for (let j = 0; j < 2 * n; j++) M[r][j] -= f * M[i][j]; }
+  }
+  return M.map(r => r.slice(n));
+}
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+function matMul(A, B) {
+  const m = A.length, n = B[0].length, k = B.length;
+  const out = Array.from({length: m}, () => new Array(n).fill(0));
+  for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) for (let p = 0; p < k; p++) out[i][j] += A[i][p] * B[p][j];
+  return out;
+}
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function add(A, B) { return A.map((r, i) => r.map((x, j) => x + B[i][j])); }
+function transpose(A) { return A[0].map((_, i) => A.map(r => r[i])); }
+
+function update11() {
+  const tau = parseFloat(document.getElementById('tau').value);
+  const view = parseFloat(document.getElementById('view').value) / 100;
+  const conf = parseInt(document.getElementById('conf').value);
+  const confName = ['low', 'medium', 'high'][conf];
+  const confMult = [10, 1, 0.1][conf];
+  document.getElementById('tau_v').textContent = tau.toFixed(2);
+  document.getElementById('view_v').textContent = (view * 100).toFixed(1) + '%';
+  document.getElementById('conf_v').textContent = confName;
+
+  const lambda = 2.5;
+  // Equilibrium returns
+  const Pi = matVec(Sigma, w_m).map(x => lambda * x);
+  // Single absolute view on US equity (asset 0)
+  const P = [[1, 0, 0, 0, 0]];
+  const Q = [view];
+  // Omega scales with confMult
+  const omega_diag = [confMult * tau * dot([1, 0, 0, 0, 0], matVec(Sigma, [1, 0, 0, 0, 0]))];
+
+  // Master formula in scalar form for simplicity (1 view)
+  const tau_Sigma = Sigma.map(r => r.map(x => x * tau));
+  const tau_Sigma_inv = inv(tau_Sigma);
+  // P' Omega^-1 P
+  const PtOPinvP = Array.from({length: N}, () => new Array(N).fill(0));
+  PtOPinvP[0][0] = 1 / omega_diag[0];
+  // A = tau_Sigma_inv + Pt Omega-1 P
+  const A = add(tau_Sigma_inv, PtOPinvP);
+  // b = tau_Sigma_inv Pi + Pt Omega-1 Q
+  const b = matVec(tau_Sigma_inv, Pi);
+  b[0] += Q[0] / omega_diag[0];
+  // posterior mean
+  const A_inv = inv(A);
+  const muBL = matVec(A_inv, b);
+  // posterior weights
+  const Sigma_inv = inv(Sigma);
+  const w_post = matVec(Sigma_inv, muBL).map(x => x / lambda);
+  // normalise to sum 1 for display
+  const sw = w_post.reduce((a, b) => a + b, 0);
+  const w_norm = w_post.map(x => x / sw);
+
+  document.getElementById('eq_ret').textContent = (Pi[0] * 100).toFixed(2) + '%';
+  document.getElementById('post_ret').textContent = (muBL[0] * 100).toFixed(2) + '%';
+  document.getElementById('weight_shift').textContent = ((w_norm[0] - w_m[0]) * 100).toFixed(2) + ' pp';
+  // Tracking error: (w - wm)' Sigma (w - wm)
+  const diff = w_norm.map((x, i) => x - w_m[i]);
+  const te = Math.sqrt(dot(diff, matVec(Sigma, diff)));
+  document.getElementById('te').textContent = (te * 100).toFixed(2) + '%';
+
+  Plotly.react('bl_plot', [
+    { x: asset_names, y: Pi.map(x => x * 100), type: 'bar', name: 'Equilibrium $\\Pi$', marker: { color: '#4a5568' } },
+    { x: asset_names, y: muBL.map(x => x * 100), type: 'bar', name: 'Posterior $\\mu_{BL}$', marker: { color: '#2b6cb0' } },
+    { x: asset_names, y: w_m.map(x => x * 100), type: 'bar', name: 'Market weights (%)', marker: { color: '#cbd5e0' }, yaxis: 'y2' },
+    { x: asset_names, y: w_norm.map(x => x * 100), type: 'bar', name: 'BL weights (%)', marker: { color: '#c05621' }, yaxis: 'y2' }
+  ], {
+    margin: { l: 60, r: 60, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Return (%)' },
+    yaxis2: { title: 'Weight (%)', overlaying: 'y', side: 'right' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['tau', 'view', 'conf'].forEach(id => document.getElementById(id).addEventListener('input', update11));
+update11();
+</script>
+</body>
+</html>
