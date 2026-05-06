@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 18: Maximum Diversification and Effective N</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 18: Maximum Diversification and Effective N</h1>
+<p class="subtitle">Module D, Week 5, Lesson 18. Diversification is the only free lunch. There are several formal definitions and they give different answers.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The diversification ratio (recap)</a></li>
+    <li><a href="#s2">Maximum Diversification Portfolio (MDP)</a></li>
+    <li><a href="#s3">Effective Number of Bets via entropy</a></li>
+    <li><a href="#s4">MDP vs ERC vs Min-var vs Equal weight</a></li>
+    <li><a href="#s5">Picking the diversification metric</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Universe correlation</h3>
+<p>The average pairwise correlation. Low correlation = many independent bets, high diversification ratio. High correlation = few bets, low DR.</p>
+<h3>Vol heterogeneity</h3>
+<p>The spread of individual asset volatilities. Affects how MDP and ERC differ.</p>
+<h3>Method toggle</h3>
+<p>Equal weight, inverse vol, ERC, MDP, min-var. Compare all five side by side.</p>
+
+<h2 id="s1">1. The diversification ratio (recap from Lesson 7)</h2>
+<div class="formula">$$DR(w) = \frac{w^\top \sigma}{\sqrt{w^\top \Sigma w}} = \frac{\text{weighted average vol}}{\text{portfolio vol}}$$</div>
+<p>Always $\ge 1$. Single asset: DR = 1. Equal weight on $N$ uncorrelated assets: DR $\to \sqrt{N}$. The bigger DR, the more diversification benefit you are extracting.</p>
+
+<h2 id="s2">2. The Maximum Diversification Portfolio</h2>
+<p>Choueifaty and Coignard (2008) define MDP as the portfolio that maximises DR over the feasible set:</p>
+<div class="formula">$$w_{\text{MDP}} = \arg\max_{w \in \Delta} \frac{w^\top \sigma}{\sqrt{w^\top \Sigma w}}$$</div>
+<p>where $\Delta$ is the simplex (long-only, sum to 1). The MDP has a closed-form-ish solution: it equals the tangency portfolio of a transformed universe where each asset has unit Sharpe (replacing $\mu_i$ with $\sigma_i$ in Markowitz). This makes MDP a cousin of mean-variance, just with $\mu = \sigma$.</p>
+<p>Properties of MDP:</p>
+<ul>
+  <li>No expected returns required.</li>
+  <li>Sits in the long-only mean-variance frontier when $\mu_i = \sigma_i$ for all $i$.</li>
+  <li>Often more concentrated than ERC, less than min-var.</li>
+  <li>Sensitive to correlation estimation error.</li>
+</ul>
+
+<h2 id="s3">3. Effective Number of Bets (Meucci 2009)</h2>
+<p>Meucci proposes a different diversification metric based on the entropy of risk contributions. First, transform the problem to uncorrelated principal components. Then compute the share of total variance from each component:</p>
+<div class="formula">$$p_k = \frac{\lambda_k (v_k^\top w)^2}{w^\top \Sigma w}$$</div>
+<p>where $\lambda_k$ and $v_k$ are eigenvalue/eigenvector pairs. The Effective Number of Bets is</p>
+<div class="formula">$$\text{ENB} = \exp\left(- \sum_k p_k \log p_k\right)$$</div>
+<p>Range: 1 (all risk on one factor) to $N$ (perfect uncorrelated diversification). Unlike DR, ENB is invariant to rotation in the asset space, so it's a more "principled" measure of how many independent bets your portfolio is making.</p>
+
+<h2 id="s4">4. MDP vs ERC vs Min-var vs Equal weight</h2>
+
+<h3>Live: side-by-side allocation comparison</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Average correlation: <span class="value" id="avgrho_v">0.30</span></label>
+      <input type="range" id="avgrho" min="-0.2" max="0.9" step="0.05" value="0.30">
+    </div>
+    <div class="control">
+      <label>Vol heterogeneity: <span class="value" id="het_v">2.0</span></label>
+      <input type="range" id="het" min="1.0" max="5.0" step="0.2" value="2.0">
+    </div>
+  </div>
+  <div id="comp_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Equal weight: DR / ENB</span><span class="stat-value" id="ew_stats">0</span></div>
+    <div class="stat"><span>Inverse vol: DR / ENB</span><span class="stat-value" id="iv_stats">0</span></div>
+    <div class="stat"><span>ERC: DR / ENB</span><span class="stat-value" id="erc_stats">0</span></div>
+    <div class="stat"><span>MDP: DR / ENB</span><span class="stat-value" id="mdp_stats">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Crank average correlation up to 0.9.</strong> All four allocations converge: when everything moves together, no allocation gives diversification. ENB drops toward 1 for all of them. Crank correlation down to -0.2: ENB rises toward N for all, but MDP captures the most diversification by construction.
+</div>
+
+<h2 id="s5">5. Picking the diversification metric</h2>
+<p><strong>DR</strong> is intuitive (a unit-free ratio) and easy to optimise (closed form). But DR depends on correlation structure in ways that don't always match what investors mean by "diversified".</p>
+<p><strong>ENB</strong> is more principled (rotation-invariant) but harder to communicate. Useful for risk reporting on factor-rich portfolios.</p>
+<p><strong>Effective N from RC entropy</strong> (Lesson 7) is similar to ENB but works in the original asset space. Easier to communicate, less rotation-invariant.</p>
+<p>Production practice: compute DR and effective-N for monitoring; use ERC or HRP as the actual allocation method (Lessons 14, 15). MDP is rare in production because of correlation-error sensitivity.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 3):</strong> The flagship cross-asset relative-value strategy (art 3) is built on equal-weighted scorecards. The empirical result: it has DR around 2.5 and ENB around 5 across 50+ instruments. MS does not run MDP because the optimised correlation structure is not stable enough. Instead they get diversification by combining many uncorrelated signals (theoretical priors), which maps each signal to roughly equal risk regardless of estimated correlations.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 MDP closed-form via the tangency analogy</h3>
+<p>Treat each asset as having $\hat \mu_i = \sigma_i$. Then the tangency portfolio formula gives</p>
+<div class="formula">$$w_{\text{MDP}} \propto \Sigma^{-1} \sigma$$</div>
+<p>where $\sigma$ is the vector of asset volatilities. Normalise to sum to 1.</p>
+<h3>6.2 ENB rotation invariance</h3>
+<p>The principal component decomposition $\Sigma = V \Lambda V^\top$ is unique up to sign. The shares $p_k = \lambda_k (v_k^\top w)^2 / (w^\top \Sigma w)$ are invariant to relabelling of components. So ENB does not depend on basis choice.</p>
+<h3>6.3 Why DR is bounded above by $\sqrt{N}$ in the uncorrelated case</h3>
+<p>For uncorrelated assets with equal vol, equal weight gives portfolio vol $\sigma / \sqrt{N}$. Weighted average vol stays at $\sigma$. Ratio: $\sqrt{N}$. Adding correlation pulls portfolio vol up (toward $\sigma$), reducing DR.</p>
+<h3>6.4 The MDP is the "1/sigma" portfolio for uncorrelated assets</h3>
+<p>If $\Sigma$ is diagonal, $\Sigma^{-1} \sigma$ becomes $\sigma / \sigma_i^2 = 1 / \sigma_i$. The MDP is exactly inverse-volatility weighting. Adding correlations rotates the allocation away from $1 / \sigma_i$.</p>
+<h3>6.5 Effective N from risk contributions</h3>
+<p>Define $r_i = \text{RC}_i / \sigma_p$ as the share of total risk from asset $i$. Then effective N $= \exp(-\sum_i r_i \log r_i)$. ERC has effective N $= N$ exactly. Concentrated portfolios have effective N near 1.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: MDP closed form</h3>
+<pre><code>def mdp(Sigma):
+    sigmas = np.sqrt(np.diag(Sigma))
+    w = np.linalg.solve(Sigma, sigmas)
+    return w / w.sum()</code></pre>
+
+<h3>Exercise B: ENB from PCA</h3>
+<pre><code>def enb(w, Sigma):
+    eigvals, eigvecs = np.linalg.eigh(Sigma)
+    p = eigvals * (eigvecs.T @ w) ** 2 / (w @ Sigma @ w)
+    p = p[p > 1e-12]
+    return np.exp(-(p * np.log(p)).sum())</code></pre>
+
+<h3>Exercise C: All four side-by-side</h3>
+<p>For a 10-asset universe, compute equal weight, inverse vol, ERC, MDP. Report DR and ENB for each.</p>
+
+<h3>Exercise D: Stability under noisy covariance</h3>
+<p>Bootstrap covariance, recompute MDP and ERC each time. Compare standard deviation of weights. ERC should be more stable.</p>
+
+<h3>Exercise E: Long-only constrained MDP</h3>
+<p>The closed-form MDP allows shorts. Add long-only constraints with cvxpy. Solve as an SOCP.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>For uncorrelated assets with equal volatility, what are equal weight, ERC, MDP weights? They should all coincide.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise A to add a 30% maximum-position constraint. Use cvxpy.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For 4 assets with $\sigma = (0.20, 0.10, 0.15, 0.20)$ and pairwise correlations all 0.4, compute DR and ENB for equal weight and for MDP. Compare.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_17_higher_moments.html">← Lesson 17</a></span>
+  <span><a href="lesson_19_multi_period.html">Next: Lesson 19, Multi-period →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+const N = 6;
+const asset_names = ['SPY','EFA','EM','AGG','GLD','OIL'];
+const base_sigma = [0.16, 0.18, 0.22, 0.06, 0.16, 0.30];
+
+function buildSigma(rho_avg, het) {
+  const adj = base_sigma.map((s, i) => s * Math.pow(het, (i - 2) / 3));
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(adj[i] * adj[j] * (i === j ? 1 : rho_avg));
+    S.push(r);
+  }
+  return { Sigma: S, sigmas: adj };
+}
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+function inv(A) {
+  const n = A.length;
+  const M = A.map((r, i) => r.concat(Array.from({length: n}, (_, j) => (i === j ? 1 : 0))));
+  for (let i = 0; i < n; i++) {
+    let p = M[i][i];
+    if (Math.abs(p) < 1e-12) for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > 1e-12) { [M[i], M[r]] = [M[r], M[i]]; p = M[i][i]; break; }
+    for (let j = 0; j < 2 * n; j++) M[i][j] /= p;
+    for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i]; for (let j = 0; j < 2 * n; j++) M[r][j] -= f * M[i][j]; }
+  }
+  return M.map(r => r.slice(n));
+}
+
+function mdp(Sigma, sigmas) {
+  const inv_S = inv(Sigma);
+  const w = matVec(inv_S, sigmas);
+  const s = w.reduce((a, b) => a + b, 0);
+  return w.map(x => x / s);
+}
+
+function ercSimple(Sigma) {
+  let w = new Array(N).fill(1 / N);
+  for (let it = 0; it < 2000; it++) {
+    let chg = 0;
+    for (let i = 0; i < N; i++) {
+      const Sw = matVec(Sigma, w);
+      const num = Sw[i] - Sigma[i][i] * w[i];
+      const totalVar = dot(w, Sw);
+      const disc = num * num + 4 * Sigma[i][i] * (1 / N) * totalVar;
+      const new_wi = (-num + Math.sqrt(Math.max(disc, 0))) / (2 * Sigma[i][i]);
+      chg = Math.max(chg, Math.abs(new_wi - w[i]));
+      w[i] = new_wi;
+    }
+    const sum = w.reduce((a, b) => a + b, 0);
+    if (Math.abs(sum) > 1e-9) w = w.map(x => x / sum);
+    if (chg < 1e-9) break;
+  }
+  return w;
+}
+
+function dr(w, Sigma, sigmas) {
+  return dot(w, sigmas) / Math.sqrt(dot(w, matVec(Sigma, w)));
+}
+function enbAsset(w, Sigma) {
+  const Sw = matVec(Sigma, w);
+  const totalVar = dot(w, Sw);
+  let H = 0;
+  for (let i = 0; i < N; i++) {
+    const r = w[i] * Sw[i] / totalVar;
+    if (r > 1e-9) H -= r * Math.log(r);
+  }
+  return Math.exp(H);
+}
+
+function update18() {
+  const rho = parseFloat(document.getElementById('avgrho').value);
+  const het = parseFloat(document.getElementById('het').value);
+  document.getElementById('avgrho_v').textContent = rho.toFixed(2);
+  document.getElementById('het_v').textContent = het.toFixed(2);
+
+  const { Sigma, sigmas } = buildSigma(rho, het);
+
+  const w_eq = new Array(N).fill(1 / N);
+  const w_iv = sigmas.map(s => 1 / s); const sumIv = w_iv.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < N; i++) w_iv[i] /= sumIv;
+  const w_erc = ercSimple(Sigma);
+  const w_mdp = mdp(Sigma, sigmas);
+
+  document.getElementById('ew_stats').textContent = dr(w_eq, Sigma, sigmas).toFixed(2) + ' / ' + enbAsset(w_eq, Sigma).toFixed(2);
+  document.getElementById('iv_stats').textContent = dr(w_iv, Sigma, sigmas).toFixed(2) + ' / ' + enbAsset(w_iv, Sigma).toFixed(2);
+  document.getElementById('erc_stats').textContent = dr(w_erc, Sigma, sigmas).toFixed(2) + ' / ' + enbAsset(w_erc, Sigma).toFixed(2);
+  document.getElementById('mdp_stats').textContent = dr(w_mdp, Sigma, sigmas).toFixed(2) + ' / ' + enbAsset(w_mdp, Sigma).toFixed(2);
+
+  Plotly.react('comp_plot', [
+    { x: asset_names, y: w_eq.map(x => x * 100), type: 'bar', name: 'Equal weight', marker: { color: '#cbd5e0' } },
+    { x: asset_names, y: w_iv.map(x => x * 100), type: 'bar', name: 'Inverse vol', marker: { color: '#90cdf4' } },
+    { x: asset_names, y: w_erc.map(x => x * 100), type: 'bar', name: 'ERC', marker: { color: '#2b6cb0' } },
+    { x: asset_names, y: w_mdp.map(x => x * 100), type: 'bar', name: 'MDP', marker: { color: '#c05621' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Weight (%)' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['avgrho', 'het'].forEach(id => document.getElementById(id).addEventListener('input', update18));
+update18();
+</script>
+</body>
+</html>

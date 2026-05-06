@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 20: Transaction Costs and Cost-Aware Rebalancing</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 20: Transaction Costs and Cost-Aware Rebalancing</h1>
+<p class="subtitle">Module E, Week 6, Lesson 20. The optimal portfolio after costs is not the cost-free optimum minus a constant. Costs change the geometry. Turnover should be a first-class decision.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Cost taxonomy</a></li>
+    <li><a href="#s2">Linear cost model</a></li>
+    <li><a href="#s3">Square-root market impact</a></li>
+    <li><a href="#s4">The no-trade region</a></li>
+    <li><a href="#s5">Garleanu-Pedersen optimal trading</a></li>
+    <li><a href="#s6">Rebalancing frequency choice</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Bid-ask cost (bp per side)</h3>
+<p>Half the bid-ask spread. For US large-cap equities: 1 to 2 bp. For mid-cap: 5 to 10 bp. For EM equities: 10 to 30 bp. For OTC corporate bonds: 20 to 100 bp.</p>
+<h3>Impact coefficient $\eta$</h3>
+<p>The square-root impact constant. Almgren et al. (2005) measured $\eta \approx 0.142$ across NYSE stocks. Higher for less liquid markets.</p>
+<h3>Rebalance frequency</h3>
+<p>Daily, weekly, monthly, quarterly. The single biggest lever for cost control.</p>
+
+<h2 id="s1">1. Cost taxonomy</h2>
+<ul>
+  <li><strong>Bid-ask spread.</strong> Half the spread paid per side of any trade. For liquid ETFs, 0.5 to 2 bp.</li>
+  <li><strong>Commissions.</strong> Fixed fee per trade. Negligible for institutional.</li>
+  <li><strong>Market impact.</strong> The price moves against you as you trade. Roughly $\sqrt{\text{trade size} / \text{ADV}}$.</li>
+  <li><strong>Financing.</strong> Borrowing cost above risk-free rate for leveraged positions.</li>
+  <li><strong>Borrow.</strong> Cost to borrow shares to short-sell. Hard-to-borrow names can cost 5 to 50% per year.</li>
+  <li><strong>Opportunity cost.</strong> Trade slippage from delays in execution.</li>
+</ul>
+
+<h2 id="s2">2. Linear cost model</h2>
+<p>The simplest cost-aware mean-variance:</p>
+<div class="formula">$$\max_w \, w^\top \mu - \tfrac{\lambda}{2} w^\top \Sigma w - \kappa \| w - w_{\text{old}} \|_1$$</div>
+<p>$\kappa$ is the proportional cost (bp / 100 / 2). The $\ell_1$ penalty is the total trade volume. This is a convex QP, easy to solve.</p>
+
+<h2 id="s3">3. Square-root market impact</h2>
+<p>Almgren (2005), Frazzini-Israel-Moskowitz (2018): market impact scales as the square root of trade size. For a trade of size $|\Delta w_i|$ as a fraction of ADV, the impact cost is</p>
+<div class="formula">$$\text{cost}_i = \eta \sigma_i \sqrt{|\Delta w_i|}$$</div>
+<p>This is a concave (in trade size) cost. Solving cost-aware MV with square-root impact is a SOCP. Slightly harder than linear but still tractable in cvxpy.</p>
+
+<h2 id="s4">4. The no-trade region</h2>
+<p>Under proportional costs, the optimal policy has a "no-trade region": a set of portfolio configurations where trading is not worth it. Inside this region, do nothing. Outside, trade to the boundary.</p>
+<p>For a single-asset Mertonian problem with proportional costs (Davis-Norman 1990), the no-trade region is a band around the cost-free optimum. The width of the band scales as $\sqrt[3]{\kappa}$.</p>
+
+<h3>Live: cost-aware rebalancer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Linear cost (bp): <span class="value" id="cost_v">10</span></label>
+      <input type="range" id="cost" min="0" max="100" step="2" value="10">
+    </div>
+    <div class="control">
+      <label>Impact coefficient $\eta$: <span class="value" id="eta_v">0.10</span></label>
+      <input type="range" id="eta" min="0" max="0.30" step="0.01" value="0.10">
+    </div>
+    <div class="control">
+      <label>Rebalance frequency: <span class="value" id="freq_v">Monthly</span></label>
+      <input type="range" id="freq" min="0" max="3" step="1" value="2">
+    </div>
+  </div>
+  <div id="cost_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Annual turnover</span><span class="stat-value" id="turn">0</span></div>
+    <div class="stat"><span>Gross Sharpe</span><span class="stat-value" id="gross">0</span></div>
+    <div class="stat"><span>Net Sharpe (after costs)</span><span class="stat-value" id="net">0</span></div>
+    <div class="stat"><span>Cost drag (% per year)</span><span class="stat-value" id="drag">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Crank the linear cost up to 50 bp.</strong> The net Sharpe collapses for daily rebalancing. Switch to monthly: net Sharpe recovers most of the gross. Then crank to weekly. The cost slope vs frequency lets you find the optimal trading cadence: where marginal alpha equals marginal cost.
+</div>
+
+<h2 id="s5">5. Garleanu-Pedersen optimal trading</h2>
+<p>Garleanu and Pedersen (2013) derive the optimal multi-period trading rule under quadratic costs and predictable returns:</p>
+<div class="formula">$$w_t^\star = w_{t-1} + (1 - \rho)(w_{\text{aim},t} - w_{t-1})$$</div>
+<p>where $w_{\text{aim},t}$ is the cost-free target for period $t$ and $\rho$ is a smoothing factor that depends on the cost-to-risk ratio. The intuition: <strong>partial adjustment</strong>. Do not trade fully to the target each period; instead trade a fraction of the way. The fraction depends on how persistent the alpha is and how costly the trade.</p>
+
+<h2 id="s6">6. Rebalancing frequency choice</h2>
+<p>Two extremes:</p>
+<ul>
+  <li><strong>Daily.</strong> Captures fast signal decay but high turnover and cost. Good for high-IC, fast-decay signals.</li>
+  <li><strong>Quarterly.</strong> Low turnover, low cost. Good for slow signals (value, fundamental).</li>
+</ul>
+<p>Heuristic: pick the frequency where $\text{IC} \cdot \sqrt{\text{frequency}} \approx \text{cost} \cdot \text{turnover per rebalance} / \text{vol}$. Equating expected alpha per rebalance with expected cost per rebalance.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 91, 366):</strong> Article 91 ("Transaction costs and portfolio strategies") quantifies cost drag across MS strategies. Article 366 covers bid-offer in OTC markets specifically. Macrosynergy's production default: monthly rebalancing for slow macro signals, weekly for trend, daily only for very high-frequency signals (rare). They use the L1 penalty rather than full square-root impact because the cvxpy speed is critical for hyperparameter tuning across many strategies.
+</div>
+
+<h2 id="s_math">7. Mathematical companion</h2>
+<h3>7.1 The L1 penalty as turnover proxy</h3>
+<p>$\| w - w_{\text{old}} \|_1 = \sum_i |\Delta w_i|$ is the total trade volume in $\ell_1$ norm. Multiplying by $\kappa$ (cost per unit traded) gives the dollar cost. Convex, piecewise linear; cvxpy handles via the simplex algorithm.</p>
+<h3>7.2 Square-root impact in convex form</h3>
+<p>$\sqrt{|\Delta w_i|}$ is concave, so $-\sqrt{|\Delta w_i|}$ is convex. The full impact cost is a concave function of trade size, but for optimisation we minimise $-\sqrt{|\Delta w_i|}$ which is convex. cvxpy: <code>cp.norm(cp.abs(w - w_old), 0.5)</code> or use the conic approximation.</p>
+<h3>7.3 The Davis-Norman no-trade band</h3>
+<p>For a single-asset Mertonian with proportional costs, the no-trade band has width</p>
+<div class="formula">$$\Delta w \approx \left(\frac{6 \kappa \sigma^2}{\gamma}\right)^{1/3}$$</div>
+<p>where $\kappa$ is the cost rate and $\gamma$ is risk aversion. The cube root means small costs produce small bands; large costs produce large bands.</p>
+<h3>7.4 Garleanu-Pedersen partial adjustment</h3>
+<p>Under quadratic costs $C(\Delta w) = \tfrac{1}{2} \Delta w^\top \Lambda \Delta w$, the optimal policy is</p>
+<div class="formula">$$w_t = (I - M) w_{t-1} + M \bar w_t$$</div>
+<p>where $M$ is a matrix that depends on $\Lambda$, $\Sigma$, and the persistence of $\bar w_t$. For diagonal $\Lambda$, $M$ is also diagonal with each entry between 0 and 1 (the partial adjustment coefficient).</p>
+<h3>7.5 The square-root law's empirical foundation</h3>
+<p>Almgren et al. (2005) regress realised execution price impact on trade size across thousands of NYSE trades. The fit is approximately</p>
+<div class="formula">$$\Delta P / P \approx \eta \sigma \sqrt{Q / \text{ADV}}$$</div>
+<p>with $\eta \approx 0.142$ for US large caps. This empirical relationship holds across asset classes with different $\eta$.</p>
+
+<h2 id="s_code">8. Coding exercises (extras)</h2>
+<h3>Exercise A: Cost-aware MV with cvxpy</h3>
+<pre><code>import cvxpy as cp
+def cost_aware_mv(mu, Sigma, lam, w_old, kappa):
+    n = len(mu)
+    w = cp.Variable(n)
+    obj = cp.Maximize(mu @ w - 0.5 * lam * cp.quad_form(w, Sigma) - kappa * cp.norm(w - w_old, 1))
+    cp.Problem(obj, [cp.sum(w) == 1]).solve()
+    return w.value</code></pre>
+
+<h3>Exercise B: Cost drag across frequencies</h3>
+<p>For a fixed signal, run daily, weekly, monthly, quarterly rebalancing. Plot net Sharpe vs frequency. Find the optimal.</p>
+
+<h3>Exercise C: Garleanu-Pedersen partial adjustment</h3>
+<p>Implement the closed form. Compare to naive full-rebalance MV. The GP policy should have lower turnover and similar Sharpe.</p>
+
+<h3>Exercise D: Square-root impact via SOCP</h3>
+<p>Implement square-root cost in cvxpy using a power cone reformulation.</p>
+
+<h3>Exercise E: Threshold rebalancing</h3>
+<p>Rebalance only when $\| w - w_{\text{old}} \|_\infty > \text{tolerance}$. Tune the tolerance to balance turnover and tracking error.</p>
+
+<h2 id="s_test">9. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the no-trade band scale as $\sqrt[3]{\kappa}$ rather than linearly with $\kappa$?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise A to add a leverage cap. Hint: $\| w \|_1 \le L$.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For 100% turnover per year and 30 bp round-trip cost, what is the cost drag in basis points?</p>
+  <p><em>Answer:</em> 30 bp.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_19_multi_period.html">← Lesson 19</a></span>
+  <span>Module E, Lesson 21 (Vol targeting) coming next.</span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function update20() {
+  const cost = parseFloat(document.getElementById('cost').value) / 10000; // bp to fraction
+  const eta = parseFloat(document.getElementById('eta').value);
+  const freq = parseInt(document.getElementById('freq').value);
+  const freqName = ['Daily', 'Weekly', 'Monthly', 'Quarterly'][freq];
+  const rebalsPerYear = [252, 52, 12, 4][freq];
+  document.getElementById('cost_v').textContent = (cost * 10000).toFixed(0);
+  document.getElementById('eta_v').textContent = eta.toFixed(2);
+  document.getElementById('freq_v').textContent = freqName;
+
+  // Assume base strategy: gross Sharpe 1.0, vol 10% annualised
+  const grossSharpe = 1.0;
+  const grossAlpha = grossSharpe * 0.10;
+  // Turnover: assumed proportional to rebalance frequency
+  // Per rebalance, expect some fraction of weight churn
+  // Slow signals: roughly sqrt(freq) effective turnover
+  const turnPerRebal = 0.10 + 0.05 * Math.sqrt(rebalsPerYear / 12); // fraction of weight churned
+  const annTurn = rebalsPerYear * turnPerRebal;
+  const linearDrag = cost * annTurn * 2; // both sides
+  // Square-root impact: assume average trade size 1% ADV
+  const adv_frac = 0.01;
+  const impactDrag = eta * 0.10 * Math.sqrt(adv_frac) * annTurn;
+  const totalDrag = linearDrag + impactDrag;
+  const netAlpha = grossAlpha - totalDrag;
+  const netSharpe = netAlpha / 0.10;
+
+  document.getElementById('turn').textContent = (annTurn * 100).toFixed(0) + '%';
+  document.getElementById('gross').textContent = grossSharpe.toFixed(2);
+  document.getElementById('net').textContent = netSharpe.toFixed(2);
+  document.getElementById('drag').textContent = (totalDrag * 100).toFixed(2) + '%';
+
+  // Plot net Sharpe vs cost across frequencies
+  const costGrid = [];
+  for (let c = 0; c <= 200; c += 5) costGrid.push(c);
+  const lines = [];
+  ['Daily', 'Weekly', 'Monthly', 'Quarterly'].forEach((name, idx) => {
+    const r = [252, 52, 12, 4][idx];
+    const tpr = 0.10 + 0.05 * Math.sqrt(r / 12);
+    const ann = r * tpr;
+    const sharpes = costGrid.map(cBp => {
+      const c = cBp / 10000;
+      const ld = c * ann * 2;
+      const id_ = eta * 0.10 * Math.sqrt(adv_frac) * ann;
+      return (grossAlpha - ld - id_) / 0.10;
+    });
+    const colors = ['#c53030', '#dd6b20', '#2b6cb0', '#22543d'];
+    lines.push({ x: costGrid, y: sharpes, mode: 'lines', name: name, line: { color: colors[idx], width: 2 } });
+  });
+  lines.push({ x: [cost * 10000], y: [netSharpe], mode: 'markers', marker: { size: 14, color: '#1a202c', symbol: 'star' }, name: 'Current' });
+
+  Plotly.react('cost_plot', lines, {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Linear cost (bp per side)' },
+    yaxis: { title: 'Net Sharpe' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['cost', 'eta', 'freq'].forEach(id => document.getElementById(id).addEventListener('input', update20));
+update20();
+</script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 17: Higher Moments and Copulas</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 17: Higher Moments and Copulas</h1>
+<p class="subtitle">Module D, Week 5, Lesson 17. Variance throws away skew and kurtosis. Some assets have valuable skew (trend, gold). Some assets have hidden kurtosis (carry, vol-selling).</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Mean-variance-skew-kurtosis optimisation</a></li>
+    <li><a href="#s2">Polynomial Goal Programming (Lai)</a></li>
+    <li><a href="#s3">Copulas: dependence beyond correlation</a></li>
+    <li><a href="#s4">Tail dependence coefficients</a></li>
+    <li><a href="#s5">Multivariate t portfolios</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Skew preference</h3>
+<p>Whether you prefer positive or negative skew. Investors prefer positive skew (lottery-like), so positive-skew assets command lower expected returns. Conversely negative-skew assets pay a "skew premium".</p>
+<h3>Copula family</h3>
+<p>Gaussian (no tail dependence), t (symmetric tail dependence), Clayton (lower-tail only), Gumbel (upper-tail only). Choose to match the empirical co-crash behaviour you see.</p>
+<h3>Tail dependence parameter</h3>
+<p>For the t copula, df controls tail dependence: low df = strong joint tails. For Clayton, $\theta$ controls lower-tail dependence.</p>
+
+<h2 id="s1">1. Mean-variance-skew-kurtosis</h2>
+<p>Generalise mean-variance utility to include higher moments:</p>
+<div class="formula">$$U(w) = \mu_p - \tfrac{\lambda_2}{2} \sigma_p^2 + \tfrac{\lambda_3}{6} S_p - \tfrac{\lambda_4}{24} K_p$$</div>
+<p>where $\mu_p, \sigma_p^2, S_p, K_p$ are portfolio mean, variance, third central moment, fourth central moment. The signs reflect typical investor preferences: like upside skew, dislike fat tails.</p>
+<p>Computing $S_p$ requires the co-skewness tensor $C_{ijk} = \mathbb{E}[(r_i - \mu_i)(r_j - \mu_j)(r_k - \mu_k)]$. Computing $K_p$ requires the co-kurtosis tensor $D_{ijkl}$. Both grow as $N^3$ and $N^4$ in size, making direct optimisation hard for large $N$.</p>
+
+<h2 id="s2">2. Polynomial Goal Programming</h2>
+<p>Lai (1991) sidesteps utility function specification by treating each moment as a goal:</p>
+<div class="formula">$$\min_w \sum_k \alpha_k \left| \frac{m_k(w) - m_k^*}{m_k^*} \right|^{p_k}$$</div>
+<p>where $m_k^*$ is the achievable optimum on moment $k$ alone. Choose $\alpha_k$ by preference. Tractable, and avoids the philosophical mess of choosing a utility function.</p>
+
+<h2 id="s3">3. Copulas: dependence beyond correlation</h2>
+<p>Sklar's theorem: any joint distribution $F(x_1, \ldots, x_N)$ decomposes uniquely into marginals plus a copula:</p>
+<div class="formula">$$F(x_1, \ldots, x_N) = C(F_1(x_1), \ldots, F_N(x_N))$$</div>
+<p>The copula $C$ captures all dependence; the marginals $F_i$ capture all univariate distribution shape.</p>
+<p>Why this matters: two distributions can have identical correlation matrices but very different joint tail behaviour. The Gaussian copula has zero tail dependence: extreme co-movements are vanishingly rare. The Student t copula has symmetric tail dependence: crashes and rallies cluster together. Clayton has lower-tail dependence only: crashes cluster, rallies don't.</p>
+
+<h2 id="s4">4. Tail dependence coefficients</h2>
+<p>The lower-tail dependence coefficient is</p>
+<div class="formula">$$\lambda_L = \lim_{u \to 0^+} P(F_1(X_1) \le u \mid F_2(X_2) \le u)$$</div>
+<p>If $\lambda_L > 0$, asset 1 crashing makes asset 2's crash much more likely. Examples:</p>
+<ul>
+  <li><strong>Gaussian:</strong> $\lambda_L = 0$. No tail dependence.</li>
+  <li><strong>Student t (df = 4, $\rho = 0.5$):</strong> $\lambda_L \approx 0.30$.</li>
+  <li><strong>Clayton ($\theta = 2$):</strong> $\lambda_L = 2^{-1/2} \approx 0.71$.</li>
+</ul>
+<p>For risk management, the t and Clayton copulas paint a darker picture than Gaussian. The same $\rho = 0.5$ produces 0% co-crash under Gaussian and 30%+ under Student t with df = 4.</p>
+
+<h3>Live: copula explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Copula: <span class="value" id="cop_v">Gaussian</span></label>
+      <input type="range" id="cop" min="0" max="2" step="1" value="0">
+    </div>
+    <div class="control">
+      <label>Correlation $\rho$: <span class="value" id="rho_v">0.5</span></label>
+      <input type="range" id="rho" min="-0.9" max="0.9" step="0.05" value="0.5">
+    </div>
+    <div class="control">
+      <label>t df / Clayton theta: <span class="value" id="par_v">4</span></label>
+      <input type="range" id="par" min="1" max="20" step="0.5" value="4">
+    </div>
+  </div>
+  <div id="cop_plot" class="plot" style="height: 400px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Empirical lower-tail dep $\lambda_L$</span><span class="stat-value" id="lambda_L">0</span></div>
+    <div class="stat"><span>Pearson correlation</span><span class="stat-value" id="pearson">0</span></div>
+    <div class="stat"><span>Joint crash freq (both &lt;= 5%)</span><span class="stat-value" id="crash">0</span></div>
+    <div class="stat"><span>Gaussian crash freq (same $\rho$)</span><span class="stat-value" id="gauss_crash">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Toggle from Gaussian to t.</strong> Same correlation, very different tail clustering. The cloud's bottom-left and top-right corners fill in dramatically. Real equity markets are closer to Student t than Gaussian. Pricing risk under Gaussian assumptions systematically underestimates joint tail loss.
+</div>
+
+<h2 id="s5">5. Multivariate t portfolios</h2>
+<p>Replace the multivariate normal with multivariate t in your portfolio model. The variance is no longer the right risk measure; CVaR or tail-VaR is. Optimisation under multivariate t can be done via Monte Carlo or with closed forms for elliptical distributions.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 96, 300):</strong> Article 96 ("Copulas and trading strategies") demonstrates copulas for cross-asset carry. Article 300 on cross-asset carry copulas shows that the diversification benefits of cross-asset carry are smaller than Gaussian models predict because tail dependence rises during crises. Macrosynergy uses copulas mainly for stress testing and tail-risk attribution, not for optimisation. The production stack still uses vol targeting + drawdown control (Lessons 21, 16) because they react fast to realised tail clustering.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+<h3>6.1 Why correlation under-tells the joint risk</h3>
+<p>Correlation is a moment of order 2. Tail dependence is a property of order $\infty$ (limit of conditional probabilities). They can disagree dramatically. Two distributions with identical covariance can have $\lambda_L = 0$ (Gaussian) and $\lambda_L = 0.7$ (Clayton).</p>
+
+<h3>6.2 Sklar's theorem proof sketch</h3>
+<p>Define $U_i = F_i(X_i)$. Then $U_i \sim \text{Uniform}(0, 1)$ (probability integral transform). Joint distribution of $(U_1, \ldots, U_N)$ is the copula by definition. Marginals are uniform. Done.</p>
+
+<h3>6.3 Computing $\lambda_L$ for Student t copula</h3>
+<p>For bivariate t with correlation $\rho$ and df $\nu$:</p>
+<div class="formula">$$\lambda_L = 2 \cdot t_{\nu+1}\left(-\sqrt{\frac{(\nu+1)(1-\rho)}{1+\rho}}\right)$$</div>
+<p>where $t_{\nu+1}$ is the CDF of a univariate t with $\nu+1$ df. Closed form, no simulation needed.</p>
+
+<h3>6.4 Polynomial Goal Programming guarantees</h3>
+<p>Convex if each $|m_k(w) - m_k^*|^{p_k}$ is convex. Mean and variance are convex in $w$ for any $\Sigma$ PSD. Skew and kurtosis are not generally convex. For practical use, linearise around the current $w$ and iterate.</p>
+
+<h3>6.5 Co-skewness tensor explosion</h3>
+<p>Co-skewness has $N(N+1)(N+2)/6$ unique entries. For $N = 50$ that's 22,100. Estimating each from finite data is hopeless without parametric assumptions. Standard practice: assume an elliptical distribution (no co-skewness) or use a factor-model decomposition to keep parameter count low.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+<h3>Exercise A: Simulate from a Student t copula</h3>
+<pre><code>def sample_t_copula(rho, df, n=1000, seed=0):
+    rng = np.random.default_rng(seed)
+    Sigma = np.array([[1, rho], [rho, 1]])
+    L = np.linalg.cholesky(Sigma)
+    z = rng.standard_normal((n, 2)) @ L.T
+    chi = rng.chisquare(df, n)
+    t = z / np.sqrt(chi[:, None] / df)
+    # Convert to uniform via t CDF (probability integral transform)
+    from scipy.stats import t as tdist
+    return tdist.cdf(t, df)</code></pre>
+
+<h3>Exercise B: Estimate $\lambda_L$ from data</h3>
+<pre><code>def empirical_tail_dep(returns_df, level=0.05):
+    n = len(returns_df)
+    qs = returns_df.quantile(level)
+    both_low = (returns_df.iloc[:, 0] < qs[0]) & (returns_df.iloc[:, 1] < qs[1])
+    return both_low.sum() / (level * n)</code></pre>
+
+<h3>Exercise C: Mean-CVaR vs mean-variance under fat tails</h3>
+<p>Generate returns from a multivariate t (df = 4). Optimise mean-CVaR and mean-variance. Report tail loss in stress scenarios.</p>
+
+<h3>Exercise D: Polynomial Goal Programming for skew</h3>
+<p>Solve a 4-asset problem with target moments. Use scipy.optimize.minimize with the PGP objective.</p>
+
+<h3>Exercise E: Stress-test under Clayton copula</h3>
+<p>Compare 95% VaR under Gaussian vs Clayton dependence with the same Pearson correlation. The Clayton VaR should be larger.</p>
+
+<h2 id="s_test">8. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the Gaussian copula have $\lambda_L = 0$? Hint: think about what happens to the conditional distribution as we go far into the tail.</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise A to draw from a Clayton copula. Hint: use the Marshall-Olkin algorithm (gamma frailty + exponential).</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For Student t copula with $\rho = 0.5$ and df = 4, compute $\lambda_L$ using the closed form. Compare to a 100,000-sample Monte Carlo estimate.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_16_cvar_drawdown.html">← Lesson 16</a></span>
+  <span><a href="lesson_18_max_diversification.html">Next: Lesson 18, Max Diversification →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function chi2(rng, df) { let s = 0; for (let i = 0; i < df; i++) { const g = randn(rng); s += g * g; } return s; }
+
+function update17() {
+  const cop = parseInt(document.getElementById('cop').value);
+  const copName = ['Gaussian', 'Student t', 'Clayton'][cop];
+  const rho = parseFloat(document.getElementById('rho').value);
+  const par = parseFloat(document.getElementById('par').value);
+  document.getElementById('cop_v').textContent = copName;
+  document.getElementById('rho_v').textContent = rho.toFixed(2);
+  document.getElementById('par_v').textContent = par.toFixed(1);
+
+  const rng = mulberry32(2026);
+  const n = 1500;
+  const xs = [], ys = [];
+  for (let i = 0; i < n; i++) {
+    let x, y;
+    if (cop === 0) {
+      // Gaussian
+      const z1 = randn(rng);
+      const z2 = randn(rng);
+      x = z1; y = rho * z1 + Math.sqrt(1 - rho * rho) * z2;
+    } else if (cop === 1) {
+      // Student t
+      const z1 = randn(rng);
+      const z2 = randn(rng);
+      const u = chi2(rng, par);
+      x = z1 / Math.sqrt(u / par);
+      y = (rho * z1 + Math.sqrt(1 - rho * rho) * z2) / Math.sqrt(u / par);
+    } else {
+      // Clayton: use Marshall-Olkin via gamma frailty
+      // For simplicity, generate uniform-marginal version directly and convert
+      const u1 = rng(), u2 = rng();
+      const v1 = u1;
+      // Clayton conditional inverse
+      const v2 = Math.pow(Math.pow(u1, -par) * (Math.pow(u2, -par / (1 + par)) - 1) + 1, -1 / par);
+      // Convert uniforms to standard normals for plot consistency
+      // Use simple inversion via inverse normal CDF (approx)
+      function invNormal(p) {
+        const t = Math.sqrt(-2 * Math.log(Math.min(Math.max(p, 1e-8), 1 - 1e-8)));
+        return (p < 0.5 ? -1 : 1) * (t - (2.515517 + 0.802853 * t + 0.010328 * t * t) / (1 + 1.432788 * t + 0.189269 * t * t + 0.001308 * t * t * t));
+      }
+      x = invNormal(v1);
+      y = invNormal(v2);
+    }
+    xs.push(x);
+    ys.push(y);
+  }
+
+  // Empirical stats
+  let mx = 0, my = 0;
+  for (let i = 0; i < n; i++) { mx += xs[i] / n; my += ys[i] / n; }
+  let cxy = 0, cxx = 0, cyy = 0;
+  for (let i = 0; i < n; i++) {
+    cxy += (xs[i] - mx) * (ys[i] - my) / n;
+    cxx += (xs[i] - mx) ** 2 / n;
+    cyy += (ys[i] - my) ** 2 / n;
+  }
+  const empPearson = cxy / Math.sqrt(cxx * cyy);
+
+  // Quantile (5%)
+  const sortedX = xs.slice().sort((a, b) => a - b);
+  const sortedY = ys.slice().sort((a, b) => a - b);
+  const qx = sortedX[Math.floor(0.05 * n)];
+  const qy = sortedY[Math.floor(0.05 * n)];
+  let bothLow = 0;
+  for (let i = 0; i < n; i++) if (xs[i] < qx && ys[i] < qy) bothLow++;
+  const lambdaL = bothLow / (0.05 * n);
+
+  // Joint crash freq with same rho but Gaussian (analytical approx)
+  // For Gaussian with rho, P(X<q, Y<q) ≈ phi2(z, z, rho)
+  // Use bivariate normal CDF approximation (simple)
+  const z = -1.645; // approx 5% quantile
+  // Simple Drezner approximation:
+  function bvncdf(a, b, rho) {
+    // Genz-style for negative quadrant
+    // Use simple Monte Carlo
+    let count = 0;
+    const rng2 = mulberry32(1);
+    const m = 5000;
+    for (let i = 0; i < m; i++) {
+      const z1 = randn(rng2);
+      const z2 = randn(rng2);
+      const x = z1, y = rho * z1 + Math.sqrt(1 - rho * rho) * z2;
+      if (x < a && y < b) count++;
+    }
+    return count / m;
+  }
+  const gaussJoint = bvncdf(z, z, rho);
+
+  document.getElementById('lambda_L').textContent = lambdaL.toFixed(3);
+  document.getElementById('pearson').textContent = empPearson.toFixed(3);
+  document.getElementById('crash').textContent = (bothLow / n * 100).toFixed(1) + '%';
+  document.getElementById('gauss_crash').textContent = (gaussJoint * 100).toFixed(1) + '%';
+
+  Plotly.react('cop_plot', [
+    { x: xs, y: ys, mode: 'markers', marker: { size: 3, opacity: 0.5, color: '#2b6cb0' }, type: 'scatter', name: 'Sample' }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Asset 1 standardised return', range: [-5, 5] },
+    yaxis: { title: 'Asset 2 standardised return', range: [-5, 5], scaleanchor: 'x' },
+    showlegend: false,
+    shapes: [
+      { type: 'line', x0: -5, x1: 5, y0: 0, y1: 0, line: { color: 'gray', width: 1 } },
+      { type: 'line', x0: 0, x1: 0, y0: -5, y1: 5, line: { color: 'gray', width: 1 } }
+    ]
+  }, { displayModeBar: false });
+}
+['cop', 'rho', 'par'].forEach(id => document.getElementById(id).addEventListener('input', update17));
+update17();
+</script>
+</body>
+</html>

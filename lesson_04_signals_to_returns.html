@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 4: From Signals to Expected Returns</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 4: From Signals to Expected Returns</h1>
+<p class="subtitle">Module A, Week 1, Lesson 4. Before any optimiser appears, we need a vector $\mu$. Where does it come from? Hint: not from the historical mean.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The expected-return decomposition</a></li>
+    <li><a href="#s2">Style premia (carry, value, momentum, defensive)</a></li>
+    <li><a href="#s3">Equilibrium returns and the implied vector</a></li>
+    <li><a href="#s4">Macro signals as conditional expected returns</a></li>
+    <li><a href="#s5">Information coefficient and Grinold's law</a></li>
+    <li><a href="#s6">Signal-to-position mapping</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Information coefficient (IC)</h3>
+<p>The cross-sectional correlation between your signal and the next-period return. Typical macro signal IC: 0.04 to 0.15. Anything above 0.10 is strong. Above 0.20 is suspicious.</p>
+<h3>Breadth $N$</h3>
+<p>The number of independent bets per period. For a single-asset trend strategy with monthly rebalances, breadth is roughly 12 per year. For a 50-asset cross-sectional strategy on weekly rebalances, it is closer to 50 * 50 = 2500 per year.</p>
+<h3>Signal half-life</h3>
+<p>How long the signal's predictive power decays. Shorter = higher turnover. Macro signals (carry, value) have half-lives of months to years. Trend signals: weeks. Microstructure signals: hours.</p>
+<h3>Cross-sectional vs time-series</h3>
+<p>Cross-sectional: rank assets within a date, go long top, short bottom. Time-series: each asset judged on its own time series, no cross-comparison. Different breadth profiles.</p>
+
+<h2 id="s1">1. The expected-return decomposition</h2>
+<p>Ilmanen (2011) decomposes any asset's expected return into building blocks:</p>
+<div class="formula">$$\mathbb{E}[r] = \text{cash rate} + \text{term/duration} + \text{credit} + \text{equity premium} + \text{style tilts}$$</div>
+<p>Each block is a "risk premium" that an investor earns for bearing a particular risk. The portfolio construction problem is: which blocks do you want exposure to, and in what proportion?</p>
+
+<p>For shorter horizons, the same decomposition can be expressed dynamically: $\mathbb{E}_t[r_{t+1}] = \mu_{\text{equilibrium}} + \mu_{\text{macro}} + \mu_{\text{style}}$. The conditional means come from signals, not from sample means.</p>
+
+<h2 id="s2">2. The four style premia (AQR / Ilmanen)</h2>
+<p>AQR's "Style Premia" framework (Asness, Ilmanen, Israel, Moskowitz 2015) identifies four robust risk premia that show up across asset classes:</p>
+<ul>
+  <li><strong>Carry.</strong> What the asset pays you for holding it (yield, dividend, futures roll, etc.). FX carry: interest rate differential. Commodity carry: backwardation. Bond carry: yield-curve slope.</li>
+  <li><strong>Value.</strong> Long undervalued assets (low price relative to fundamental anchor: P/E, P/B, REER). The mean-reversion premium.</li>
+  <li><strong>Momentum.</strong> Long recent winners, short recent losers. Time-series or cross-sectional. The trend premium.</li>
+  <li><strong>Defensive.</strong> Long low-beta or low-vol assets. The "betting against beta" premium.</li>
+</ul>
+<p>These four work in equities, bonds, commodities, FX, with surprising robustness over 100+ years. Not all are present in all assets, but the intersection is non-empty for any major liquid market.</p>
+
+<h2 id="s3">3. Equilibrium returns and reverse optimisation</h2>
+<p>If you have no signal, what is the best estimate of $\mu$? Not the historical mean (too noisy), not zero (markets do offer premia). The clean answer: the implied returns from holding the market portfolio at equilibrium.</p>
+<div class="formula">$$\Pi = \lambda \Sigma w_m$$</div>
+<p>where $w_m$ is the market-cap weight vector and $\lambda$ is the representative investor's risk aversion. This is the Black-Litterman prior (Lesson 11). It is internally consistent: optimising on $\Pi$ gives back $w_m$.</p>
+
+<p>Most practitioners start with $\Pi$ as the prior $\mu$, then add view shifts from macro signals. This is exactly the Black-Litterman pipeline previewed here.</p>
+
+<h2 id="s4">4. Macro signals as conditional expected returns</h2>
+<p>Macrosynergy's framework: build a "conditional expected return" by combining a small set of theoretically motivated macro signals.</p>
+<p>For FX: relative growth differential, real interest rate differential, current account balance, terms of trade. Each scored as a z-score within a panel and then equal-weighted into a composite.</p>
+<p>For rates: real yield level, fiscal stance, growth nowcast, inflation expectations.</p>
+<p>For equity country allocation: macro-quantamental scorecard with 5 to 10 themes (art 15).</p>
+<p>The key principle (recurring throughout MS): each signal is constructed from theoretical priors, not learned from in-sample backtest performance. Equal-weighted composite. No optimisation.</p>
+
+<h2 id="s5">5. IC, IR, Grinold's law</h2>
+<p>The information coefficient measures signal quality:</p>
+<div class="formula">$$\text{IC} = \text{Corr}(s_t, r_{t+1})$$</div>
+<p>computed cross-sectionally (across assets at each date) or time-serially (across dates for one asset).</p>
+<p>The information ratio is the ex-ante alpha per unit of active risk:</p>
+<div class="formula">$$\text{IR} \approx \text{IC} \cdot \sqrt{\text{breadth}}$$</div>
+<p>Grinold's "fundamental law of active management" (1989). Doubles your IC, doubles your IR. Quadruples your breadth, doubles your IR. Combining many low-IC signals on many assets is the only way to get high IR.</p>
+
+<h3>Live: signal explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>True IC: <span class="value" id="ic_v">0.10</span></label>
+      <input type="range" id="ic" min="0" max="0.30" step="0.01" value="0.10">
+    </div>
+    <div class="control">
+      <label>Breadth $N$: <span class="value" id="brd_v">200</span></label>
+      <input type="range" id="brd" min="10" max="2000" step="10" value="200">
+    </div>
+    <div class="control">
+      <label>Signal half-life (months): <span class="value" id="hl_v">6</span></label>
+      <input type="range" id="hl" min="1" max="36" step="1" value="6">
+    </div>
+  </div>
+  <div id="signal_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Implied IR</span><span class="stat-value" id="ir">0</span></div>
+    <div class="stat"><span>Annualised gross alpha</span><span class="stat-value" id="alpha">0</span></div>
+    <div class="stat"><span>Annual turnover</span><span class="stat-value" id="turn">0</span></div>
+    <div class="stat"><span>Net Sharpe at 30 bp cost</span><span class="stat-value" id="net">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide breadth from 10 to 2000.</strong> A signal with IC = 0.05 is unusable on 10 assets but produces IR > 2 on 2000 cross-sectional bets. Now reduce the half-life from 24 months to 1 month. Turnover explodes; net-of-cost Sharpe collapses. The art is finding signals with both high IC and slow decay.
+</div>
+
+<h2 id="s6">6. Signal-to-position mapping</h2>
+<p>Once you have a composite signal, you need to map it to a position. Macrosynergy's conventions (art 5, 15):</p>
+<ul>
+  <li><strong>Sequential z-score.</strong> For each date and each asset, compute $z = (s - \mu_s) / \sigma_s$ using only data available at $t$.</li>
+  <li><strong>Capping.</strong> Clip $z$ at $\pm 2$ or $\pm 3$ to avoid blowups from outliers.</li>
+  <li><strong>Sigmoid sizing.</strong> Map the capped z to a position via $w \propto 2 / (1 + e^{-k z}) - 1$. Smooth, differentiable, no discrete jumps.</li>
+  <li><strong>Vol targeting.</strong> Multiply by $\sigma_{\text{target}} / \sigma_{\text{recent}}$ at the asset level.</li>
+</ul>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 38, 50, 65):</strong> The MS signal stack is the building blocks of every published strategy. Article 38 frames the "macro quantamental" approach. Article 50 gives the three-step protocol for evaluating any signal: (1) predictive correlation, (2) accuracy/hit-rate, (3) naive PnL. Article 65 expands this with quality diagnostics. The conceptual parity philosophy: equal-weight signals within a theme, equal-weight themes within an asset, equal-weight assets within a strategy. Never optimise the weights, even when in-sample tests favour optimisation.
+</div>
+
+<h2 id="s_math">7. Mathematical companion</h2>
+<h3>7.1 Why the historical mean is a terrible $\mu$</h3>
+<p>The standard error of the sample mean of returns is $\sigma / \sqrt{T}$. For monthly returns at 15% annualised vol over 30 years, the standard error is $0.15 / \sqrt{30} \approx 2.7\%$. So your point estimate is $\hat \mu \pm 5.4\%$ (95% CI). That's bigger than most premia. The historical mean is the maximum likelihood estimator, but its sampling variance is so large that it's useless for portfolio optimisation.</p>
+
+<h3>7.2 Reverse optimisation derivation</h3>
+<p>Mean-variance solution: $w^\star = (\lambda \Sigma)^{-1} \mu$. Set $w^\star = w_m$ (the market). Solve for $\mu$: $\mu = \lambda \Sigma w_m$. This is the equilibrium prior, automatically internally consistent.</p>
+
+<h3>7.3 The IC-IR identity</h3>
+<p>For a signal-based strategy with cross-sectional rank correlation IC and breadth $N$, the active risk-adjusted return is approximately</p>
+<div class="formula">$$\text{IR} \approx \text{IC} \cdot \sqrt{N}$$</div>
+<p>under the assumption that signals across the $N$ assets are independent and unbiased. The proof is a CLT applied to the sum of independent signal contributions. Grinold and Kahn (2000) give the formal derivation.</p>
+
+<h3>7.4 Sigmoid vs threshold position sizing</h3>
+<p>Linear sizing $w = z$ is unbounded; large signals create huge positions. Threshold sizing $w = \mathbb{1}(z > c)$ has discrete jumps and large turnover near the threshold. Sigmoid $w = \tanh(k z)$ caps positions smoothly. Choose $k$ such that $\tanh(k \cdot 2) \approx 0.95$, so a 2-sigma signal hits 95% of max position.</p>
+
+<h3>7.5 Signal decay and rebalancing frequency</h3>
+<p>If signal $s$ has autocorrelation $\rho$ at the rebalancing frequency, a fraction $1 - \rho$ of the position must be turned over each period. Annual turnover $\approx N \cdot (1 - \rho)$ where $N$ is the number of rebalances per year. Slow signals: fewer rebalances. Fast signals: more rebalances and more cost.</p>
+
+<h2 id="s_code">8. Coding exercises (extras)</h2>
+<h3>Exercise A: Z-score within date</h3>
+<pre><code>def zscore_within_date(signal: pd.DataFrame) -> pd.DataFrame:
+    return signal.sub(signal.mean(axis=1), axis=0).div(signal.std(axis=1), axis=0)</code></pre>
+
+<h3>Exercise B: Sigmoid sizing</h3>
+<pre><code>def sigmoid_position(z, k=1.0, max_pos=1.0):
+    return max_pos * np.tanh(k * np.clip(z, -3, 3))</code></pre>
+
+<h3>Exercise C: Information coefficient</h3>
+<pre><code>def information_coefficient(signal: pd.DataFrame, returns: pd.DataFrame) -> pd.Series:
+    """Cross-sectional rank IC at each date."""
+    return signal.corrwith(returns.shift(-1), axis=1, method='spearman')</code></pre>
+
+<h3>Exercise D: Equilibrium returns</h3>
+<pre><code>def implied_returns(w_market, Sigma, lambda_=2.5):
+    return lambda_ * Sigma @ w_market</code></pre>
+
+<h3>Exercise E: Style premia composite</h3>
+<p>Build a 4-signal composite (carry, value, momentum, defensive) for a 10-asset universe. Equal-weight. Compute IC, IR, turnover. Compare to each individual signal.</p>
+
+<h2 id="s_test">9. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does Grinold's law require the signals to be independent? What happens when you stack 5 highly correlated signals?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Build a carry signal for 5 currencies (EUR, JPY, GBP, AUD, NZD vs USD). Use the interest rate differential as the signal. Z-score within date. Sigmoid to positions. Backtest 10 years.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For IC = 0.08, breadth = 100, what is the implied IR? What if you can only execute 50 of those 100 bets due to liquidity? Compare.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_03_risk_measures.html">← Lesson 3</a></span>
+  <span><a href="lesson_05_markowitz.html">Next: Lesson 5, Markowitz →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function update4() {
+  const ic = parseFloat(document.getElementById('ic').value);
+  const brd = parseInt(document.getElementById('brd').value);
+  const hl = parseInt(document.getElementById('hl').value);
+  document.getElementById('ic_v').textContent = ic.toFixed(2);
+  document.getElementById('brd_v').textContent = brd;
+  document.getElementById('hl_v').textContent = hl;
+
+  const ir = ic * Math.sqrt(brd);
+  // Assume base signal vol = 1, mapped to ~10% annual portfolio risk
+  const portRisk = 0.10;
+  const grossAlpha = ir * portRisk;
+  // turnover proportional to 1 - exp(-1/hl) per month, x12 = annual
+  const monthlyTurn = 1 - Math.exp(-1 / hl);
+  const annualTurn = 12 * monthlyTurn;
+  const costDrag = 0.0030 * annualTurn; // 30 bp per round trip
+  const netAlpha = grossAlpha - costDrag;
+  const netSharpe = netAlpha / portRisk;
+
+  document.getElementById('ir').textContent = ir.toFixed(3);
+  document.getElementById('alpha').textContent = (grossAlpha * 100).toFixed(2) + '%';
+  document.getElementById('turn').textContent = (annualTurn * 100).toFixed(0) + '%';
+  document.getElementById('net').textContent = netSharpe.toFixed(2);
+
+  // Plot: gross vs net Sharpe across breadth
+  const brdGrid = [];
+  for (let n = 10; n <= 2000; n = Math.max(n + 5, Math.ceil(n * 1.05))) brdGrid.push(n);
+  const grossSR = brdGrid.map(n => ic * Math.sqrt(n));
+  const netSR = brdGrid.map(n => ic * Math.sqrt(n) - costDrag / portRisk);
+
+  Plotly.react('signal_plot', [
+    { x: brdGrid, y: grossSR, mode: 'lines', name: 'Gross IR (Grinold)', line: { color: '#2b6cb0', width: 2 } },
+    { x: brdGrid, y: netSR, mode: 'lines', name: 'Net Sharpe at 30 bp', line: { color: '#c05621', width: 2 } },
+    { x: [brd], y: [ir], mode: 'markers', marker: { size: 12, color: '#c53030', symbol: 'star' }, name: 'Current N' }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Breadth N (independent bets per year)', type: 'log' },
+    yaxis: { title: 'IR or Sharpe' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['ic', 'brd', 'hl'].forEach(id => document.getElementById(id).addEventListener('input', update4));
+update4();
+</script>
+</body>
+</html>

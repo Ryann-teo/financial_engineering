@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 19: Multi-period and Dynamic Portfolios</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc a { color: #2b6cb0; text-decoration: none; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 19: Multi-period and Dynamic Portfolios</h1>
+<p class="subtitle">Module D, Week 5, Lesson 19. Real portfolios are managed over time. Single-period mean-variance ignores intertemporal hedging, transaction costs across periods, and the path-dependence of risk.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Why single-period is not enough</a></li>
+    <li><a href="#s2">Merton's intertemporal portfolio choice</a></li>
+    <li><a href="#s3">The HJB equation</a></li>
+    <li><a href="#s4">Intertemporal hedging demand</a></li>
+    <li><a href="#s5">Connection to Kelly</a></li>
+    <li><a href="#s6">Practical multi-period: rolling reoptimisation</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+<h3>Investment horizon $T$</h3>
+<p>Number of years over which utility is evaluated. Long horizons amplify intertemporal hedging effects.</p>
+<h3>Risk aversion $\gamma$ (CRRA)</h3>
+<p>Constant Relative Risk Aversion. $\gamma = 1$ is log utility (Kelly investor). $\gamma > 1$ is more risk averse. $\gamma < 1$ is less risk averse.</p>
+<h3>State variable persistence</h3>
+<p>How quickly does the investment opportunity (e.g. equity premium) revert? High persistence = stronger hedging demand.</p>
+
+<h2 id="s1">1. Why single-period is not enough</h2>
+<p>Single-period MV assumes you trade once, then sit for $T$ periods. Real investors trade continuously, and the optimal $w$ depends on:</p>
+<ol>
+  <li>The current investment opportunity ($\mu_t$, $\Sigma_t$).</li>
+  <li>Future investment opportunities (will $\mu$ rise or fall?).</li>
+  <li>Wealth dynamics (compounding, leverage).</li>
+  <li>Transaction costs (Lesson 20).</li>
+</ol>
+<p>Single-period MV captures only (1). Multi-period adds (2), (3), (4). The biggest practical effect is (2): if the equity premium is mean-reverting, today's high premium predicts tomorrow's low premium, and you should hold less equity than single-period MV suggests.</p>
+
+<h2 id="s2">2. Merton's intertemporal portfolio choice</h2>
+<p>Merton (1969, 1971) solves the continuous-time portfolio problem with CRRA utility $u(W) = W^{1-\gamma} / (1 - \gamma)$ and one risky asset following geometric Brownian motion. The optimal weight on the risky asset is</p>
+<div class="formula">$$w^\star = \frac{\mu - r_f}{\gamma \sigma^2}$$</div>
+<p>For $\gamma = 1$ (log utility): $w^\star = (\mu - r_f) / \sigma^2$. This is the Kelly weight (Lesson 22) divided by 1. For $\gamma = 5$ (typical): $w^\star = (\mu - r_f) / (5 \sigma^2)$, which is fractional Kelly with fraction $1/5$.</p>
+<p>Notice: <strong>the Merton solution is single-period under GBM with constant $\mu$ and $\sigma$.</strong> Multi-period magic happens only when investment opportunities change over time.</p>
+
+<h2 id="s3">3. The HJB equation</h2>
+<p>The full multi-period problem with stochastic investment opportunities solves the Hamilton-Jacobi-Bellman PDE:</p>
+<div class="formula">$$\frac{\partial V}{\partial t} + \max_w \left[u(c) + \mathcal{L} V \right] = 0$$</div>
+<p>where $V(W, x, t)$ is the value function, $x$ is a state variable (e.g. dividend yield, term spread), $c$ is consumption, and $\mathcal{L}$ is the infinitesimal generator. The Bellman optimality condition. Solving HJB analytically requires special structure (e.g. CRRA + linear-Gaussian dynamics give the affine value function of Liu 2007 and Wachter 2002).</p>
+
+<h2 id="s4">4. Intertemporal hedging demand</h2>
+<p>The optimal weight in the HJB-solved problem decomposes:</p>
+<div class="formula">$$w^\star = \underbrace{\frac{\mu - r_f}{\gamma \sigma^2}}_{\text{myopic}} + \underbrace{\frac{1}{\gamma} \cdot \frac{\partial \log V / \partial x}{\sigma_W \sigma_x \rho_{Wx}}}_{\text{hedging demand}}$$</div>
+<p>The first term is the single-period Merton solution. The second is the <strong>intertemporal hedging demand</strong>: a tilt toward (or away from) the asset based on whether it hedges changes in future investment opportunities.</p>
+<p>Empirical example: equities have negative correlation with their own future expected returns (high premium today predicts low premium tomorrow, and vice versa). This is why Campbell and Viceira (2002) show that long-horizon investors should hold MORE equities than single-period MV suggests, even though equities are more volatile in the short run. The dividend yield as a state variable creates a hedging demand.</p>
+
+<h3>Live: rolling reoptimisation vs static</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Mean reversion strength: <span class="value" id="mr_v">0.10</span></label>
+      <input type="range" id="mr" min="0" max="0.50" step="0.05" value="0.10">
+    </div>
+    <div class="control">
+      <label>Risk aversion $\gamma$: <span class="value" id="gam_v">3</span></label>
+      <input type="range" id="gam" min="1" max="10" step="0.5" value="3">
+    </div>
+    <div class="control">
+      <label>Horizon (years): <span class="value" id="hor_v">10</span></label>
+      <input type="range" id="hor" min="1" max="30" step="1" value="10">
+    </div>
+  </div>
+  <div id="dyn_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Average myopic $w$</span><span class="stat-value" id="myop">0</span></div>
+    <div class="stat"><span>Average dynamic $w$</span><span class="stat-value" id="dyn">0</span></div>
+    <div class="stat"><span>CRRA utility (myopic)</span><span class="stat-value" id="u_myop">0</span></div>
+    <div class="stat"><span>CRRA utility (dynamic)</span><span class="stat-value" id="u_dyn">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Crank mean reversion strength up to 0.50.</strong> The dynamic strategy starts to differ visibly from the myopic. With strong mean reversion, the dynamic strategy "buys low, sells high" by exploiting the predictable pattern. CRRA utility for the dynamic strategy is higher.
+</div>
+
+<h2 id="s5">5. Connection to Kelly</h2>
+<p>For log utility ($\gamma = 1$), Merton's solution equals Kelly: $w^\star = (\mu - r_f) / \sigma^2$. Log utility is the unique CRRA utility for which myopic = dynamic, regardless of how investment opportunities evolve. Kelly investors are myopic by virtue of their utility function, not because they ignore the future.</p>
+
+<h2 id="s6">6. Practical multi-period: rolling reoptimisation</h2>
+<p>For most production systems, the HJB solution is intractable (state space too large, distributions too non-standard). The standard workaround:</p>
+<ol>
+  <li>Re-estimate $\mu_t$, $\Sigma_t$ each period using rolling windows.</li>
+  <li>Solve the single-period MV problem with current estimates.</li>
+  <li>Apply turnover penalties (Lesson 20) to discourage over-trading.</li>
+  <li>Repeat each rebalancing period.</li>
+</ol>
+<p>This "naive multi-period" misses intertemporal hedging but captures the time-varying opportunity set. For most practitioners it's good enough.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy, AQR):</strong> Most macro and systematic shops use rolling reoptimisation rather than HJB. Macrosynergy's pipeline (art 39) re-evaluates signals each rebalancing period without forecasting their persistence. AQR's research suggests that long-horizon investors gain only modest utility from full HJB versus naive rolling, given realistic estimates of return predictability. Article 186 explores reinforcement learning as an alternative to HJB for trading systems.
+</div>
+
+<h2 id="s_math">7. Mathematical companion</h2>
+<h3>7.1 Merton's solution under CRRA + GBM</h3>
+<p>Wealth follows $dW = W [r_f + w (\mu - r_f)] dt + W w \sigma dB$. Maximise $\mathbb{E}[u(W_T)]$. Hamilton-Jacobi-Bellman gives a Riccati equation that solves analytically. The optimal $w^\star = (\mu - r_f) / (\gamma \sigma^2)$ is constant in time, only depends on parameters.</p>
+<h3>7.2 Why log utility is myopic</h3>
+<p>$u(W) = \log W$ implies $u(W \cdot R) = \log W + \log R$. Future utility is additively separable in current and future log wealth. Today's decision affects only today's $\log R$, independently of future decisions. This is the formal reason Kelly is myopic.</p>
+<h3>7.3 Campbell-Viceira hedging demand</h3>
+<p>Under linear-Gaussian state dynamics for log dividend yield, the hedging demand has closed form via affine value function. Sign and magnitude depend on the correlation between equity returns and innovations to the state variable. Empirically the sign is negative (mean-reverting equity premium), making long-horizon investors more equity-hungry.</p>
+<h3>7.4 Discrete-time HJB approximation</h3>
+<p>Discretise the state space and solve via dynamic programming. For two state variables and $T = 50$ periods, computational complexity is $O(N_x N_y T)$. Tractable for small problems, intractable for production.</p>
+<h3>7.5 Reinforcement learning as continuous HJB</h3>
+<p>Modern RL (Q-learning, actor-critic) learns the value function from simulated trajectories without explicit HJB solution. Promising for problems where the dynamics are too complex for analytical methods.</p>
+
+<h2 id="s_code">8. Coding exercises (extras)</h2>
+<h3>Exercise A: Merton's solution</h3>
+<pre><code>def merton_weight(mu, sigma, rf, gamma):
+    return (mu - rf) / (gamma * sigma ** 2)</code></pre>
+
+<h3>Exercise B: Discrete dynamic programming</h3>
+<p>Solve a 2-asset, 1-state-variable problem with T=10 periods using backward induction. Compare to myopic.</p>
+
+<h3>Exercise C: Rolling reoptimisation backtest</h3>
+<p>Use a rolling 60-month window. Re-solve MV each month. Track turnover and Sharpe.</p>
+
+<h3>Exercise D: Hedging demand sign</h3>
+<p>Estimate the empirical hedging demand for SPY using dividend yield as the state variable. Confirm it is positive (long horizon investors hold MORE equity).</p>
+
+<h3>Exercise E: Compare static, rolling, dynamic</h3>
+<p>On synthetic data with mean-reverting $\mu$, run static MV, rolling MV, and a simple dynamic strategy (tilt toward asset when state variable is low). Report Sharpe and final wealth.</p>
+
+<h2 id="s_test">9. Self test</h2>
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why is log utility ($\gamma = 1$) the unique CRRA utility for which myopic = dynamic optimal?</p>
+</div>
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Implement a 2-state HJB solver with backward induction. State variable: equity premium AR(1). Apply to a 2-asset universe. Report the dynamic policy.</p>
+</div>
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For $\mu = 8\%$, $\sigma = 16\%$, $r_f = 2\%$, $\gamma = 4$, what is Merton's optimal equity weight? Compare to Kelly ($\gamma = 1$). Both are myopic under GBM.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_18_max_diversification.html">← Lesson 18</a></span>
+  <span><a href="lesson_20_costs.html">Next: Lesson 20, Transaction costs →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+});
+
+function mulberry32(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function update19() {
+  const mr = parseFloat(document.getElementById('mr').value);
+  const gamma = parseFloat(document.getElementById('gam').value);
+  const hor = parseInt(document.getElementById('hor').value);
+  document.getElementById('mr_v').textContent = mr.toFixed(2);
+  document.getElementById('gam_v').textContent = gamma.toFixed(1);
+  document.getElementById('hor_v').textContent = hor;
+
+  // Simulate mean-reverting equity premium
+  const T = hor * 12; // monthly
+  const rng = mulberry32(2026);
+  const muBar = 0.06 / 12;
+  const sigma = 0.16 / Math.sqrt(12);
+  const rf = 0.02 / 12;
+  const sigmaMu = 0.04 / Math.sqrt(12);
+  const muT = new Array(T);
+  muT[0] = muBar;
+  for (let t = 1; t < T; t++) {
+    muT[t] = muT[t-1] + mr * (muBar - muT[t-1]) + sigmaMu * randn(rng);
+  }
+  // Returns
+  const ret = muT.map(m => m + sigma * randn(rng));
+  // Myopic: w_t = average mu / (gamma sigma^2)
+  const w_myopic = (muBar - rf) / (gamma * sigma * sigma);
+  const w_myopic_arr = new Array(T).fill(w_myopic);
+  // Dynamic: tilt with state
+  const w_dynamic = muT.map(m => Math.max(-0.5, Math.min(2.0, (m - rf) / (gamma * sigma * sigma))));
+
+  // Wealth paths
+  const W_myopic = new Array(T + 1); W_myopic[0] = 1;
+  const W_dynamic = new Array(T + 1); W_dynamic[0] = 1;
+  for (let t = 0; t < T; t++) {
+    W_myopic[t+1] = W_myopic[t] * (1 + rf + w_myopic_arr[t] * (ret[t] - rf));
+    W_dynamic[t+1] = W_dynamic[t] * (1 + rf + w_dynamic[t] * (ret[t] - rf));
+  }
+
+  const u_myop = gamma === 1 ? Math.log(W_myopic[T]) : (Math.pow(W_myopic[T], 1 - gamma) - 1) / (1 - gamma);
+  const u_dyn = gamma === 1 ? Math.log(W_dynamic[T]) : (Math.pow(W_dynamic[T], 1 - gamma) - 1) / (1 - gamma);
+
+  document.getElementById('myop').textContent = w_myopic.toFixed(2);
+  document.getElementById('dyn').textContent = (w_dynamic.reduce((a, b) => a + b, 0) / T).toFixed(2);
+  document.getElementById('u_myop').textContent = u_myop.toFixed(3);
+  document.getElementById('u_dyn').textContent = u_dyn.toFixed(3);
+
+  Plotly.react('dyn_plot', [
+    { y: W_myopic, mode: 'lines', name: 'Myopic (constant w)', line: { color: '#cbd5e0', width: 2 } },
+    { y: W_dynamic, mode: 'lines', name: 'Dynamic (state-dependent w)', line: { color: '#2b6cb0', width: 2 } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Month' },
+    yaxis: { title: 'Wealth (growth of $1)' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['mr', 'gam', 'hor'].forEach(id => document.getElementById(id).addEventListener('input', update19));
+update19();
+</script>
+</body>
+</html>
