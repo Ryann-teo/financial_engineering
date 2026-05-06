@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 6: KKT and Constraints</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root { --bg: #fafbfc; --fg: #1a202c; --muted: #4a5568; --primary: #2b6cb0; --accent: #c05621; --border: #e2e8f0; --insight: #fffbea; --insight-border: #f59e0b; --code-bg: #1a202c; --code-fg: #e2e8f0; --demo-bg: #f7fafc; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 2.1rem; color: var(--primary); margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: var(--accent); margin-top: 2rem; }
+  .toc { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .demo { background: var(--demo-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: var(--muted); font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: var(--accent); font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: var(--insight); border-left: 4px solid var(--insight-border); padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid var(--primary); }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: var(--code-bg); color: var(--code-fg); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid var(--border); }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); }
+  .nav a { color: var(--primary); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 6: KKT, Constraints, and the Convex Programming Workflow</h1>
+<p class="subtitle">Module B, Week 2, Lesson 6. Real portfolios live inside constraints. Learn the language of KKT to read and write any modern optimisation paper.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Convex sets and convex functions</a></li>
+    <li><a href="#s2">Lagrangians and duality</a></li>
+    <li><a href="#s3">The KKT conditions</a></li>
+    <li><a href="#s4">Constrained Markowitz: the working machinery</a></li>
+    <li><a href="#s5">Reading dual values: the cost of a constraint</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+
+<h3>Long-only toggle</h3>
+<p>Adds the constraint $w_i \ge 0$ for all $i$. Forbids short positions. Common for retail, mutual funds, ETFs. Makes the optimisation strictly less favourable than unconstrained Markowitz, but is often required by mandate.</p>
+
+<h3>Maximum position $w_{\max}$</h3>
+<p>Caps each $w_i \le w_{\max}$. Prevents concentration. Typical: 10% to 40%. Tight caps reduce single-name risk; loose caps allow the optimiser to find any winner-takes-all allocation.</p>
+
+<h3>Sector cap</h3>
+<p>$\sum_{i \in S} w_i \le c_S$ for sector $S$. Mandate-style constraint. Common values: 25 to 35% per sector for diversified strategies.</p>
+
+<h3>Leverage cap</h3>
+<p>$\sum_i |w_i| \le L$. The $L^1$ norm of the weight vector. $L = 1$ is unleveraged. $L = 1.5$ allows a 130/30 long-short structure. $L = 2$ is fully leveraged 100/100.</p>
+
+<h2 id="s1">1. Convex sets and convex functions</h2>
+
+<p>A set $C$ is <strong>convex</strong> if for all $x, y \in C$ and $\theta \in [0, 1]$, we have $\theta x + (1 - \theta) y \in C$. The line segment between any two points stays inside the set. Examples: half-spaces, intersections of half-spaces (polyhedra), Euclidean balls, the simplex.</p>
+
+<p>A function $f$ is convex if $f(\theta x + (1 - \theta) y) \le \theta f(x) + (1 - \theta) f(y)$. Geometrically, the chord lies above the graph. The portfolio variance $w^\top \Sigma w$ is convex in $w$ (because $\Sigma$ is positive semi-definite).</p>
+
+<p>A <strong>convex optimisation problem</strong> minimises a convex objective over a convex set. The local minimum is the global minimum. Solvers exist that find it in polynomial time. The Markowitz problem is convex. Most practical portfolio optimisations in this course are convex.</p>
+
+<h2 id="s2">2. Lagrangians and duality</h2>
+
+<p>For a constrained problem $\min_x f(x)$ subject to $g_i(x) \le 0$ and $h_j(x) = 0$, the <strong>Lagrangian</strong> is</p>
+<div class="formula">$$\mathcal{L}(x, \lambda, \nu) = f(x) + \sum_i \lambda_i g_i(x) + \sum_j \nu_j h_j(x)$$</div>
+<p>$\lambda_i \ge 0$ are Lagrange multipliers for inequality constraints. $\nu_j$ are multipliers for equality constraints (no sign restriction).</p>
+
+<p>The <strong>dual function</strong> is $g(\lambda, \nu) = \min_x \mathcal{L}(x, \lambda, \nu)$. Always concave. The <strong>dual problem</strong> is $\max_{\lambda \ge 0, \nu} g(\lambda, \nu)$. Weak duality says the dual optimum is at most the primal optimum. <strong>Strong duality</strong> says they are equal, and holds for convex problems satisfying Slater's condition (a strictly feasible point exists).</p>
+
+<h2 id="s3">3. The KKT conditions</h2>
+
+<p>For a convex problem, $x^\star$ is optimal iff there exist $\lambda^\star, \nu^\star$ such that:</p>
+<div class="formula">$$\nabla f(x^\star) + \sum_i \lambda_i^\star \nabla g_i(x^\star) + \sum_j \nu_j^\star \nabla h_j(x^\star) = 0 \quad \text{(stationarity)}$$
+$$g_i(x^\star) \le 0, \quad h_j(x^\star) = 0 \quad \text{(primal feasibility)}$$
+$$\lambda_i^\star \ge 0 \quad \text{(dual feasibility)}$$
+$$\lambda_i^\star g_i(x^\star) = 0 \quad \text{(complementary slackness)}$$</div>
+
+<p>The fourth condition is the most important for intuition. <strong>Complementary slackness</strong> says either the constraint is tight ($g_i(x^\star) = 0$) or the multiplier is zero ($\lambda_i^\star = 0$). A constraint that is not tight contributes nothing to the optimum and has zero shadow price.</p>
+
+<p>The set of constraints with $\lambda_i^\star > 0$ is called the <strong>active set</strong>. Identifying the active set is the central computational task in interior-point and active-set solvers.</p>
+
+<h2 id="s4">4. Constrained Markowitz</h2>
+
+<h3>Live: drag constraints, watch the frontier shrink</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Risk aversion $\lambda$: <span class="value" id="lam_v">5.0</span></label>
+      <input type="range" id="lam" min="0.5" max="20" step="0.1" value="5.0">
+    </div>
+    <div class="control">
+      <label>Long only?: <span class="value" id="long_v">on</span></label>
+      <input type="range" id="long_only" min="0" max="1" step="1" value="1">
+    </div>
+    <div class="control">
+      <label>Max position $w_{\max}$: <span class="value" id="cap_v">0.40</span></label>
+      <input type="range" id="cap" min="0.10" max="1.00" step="0.05" value="0.40">
+    </div>
+    <div class="control">
+      <label>Mean shift $\mu_1$ (bp): <span class="value" id="shift_v">0</span></label>
+      <input type="range" id="shift" min="-300" max="300" step="10" value="0">
+    </div>
+  </div>
+  <div id="frontier_plot" class="plot" style="height: 380px;"></div>
+  <div id="weights_plot" class="plot" style="height: 280px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Optimal mean</span><span class="stat-value" id="opt_mean">0</span></div>
+    <div class="stat"><span>Optimal vol</span><span class="stat-value" id="opt_vol">0</span></div>
+    <div class="stat"><span>Sharpe</span><span class="stat-value" id="opt_sr">0</span></div>
+    <div class="stat"><span>Active constraints</span><span class="stat-value" id="active_n">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Toggle long-only on, then crank $w_{\max}$ down from 1.0 to 0.20.</strong> The frontier visibly shrinks and shifts right (less return for the same risk). The bar chart shows weights clipping at the cap. The "active constraints" counter rises. Each binding constraint costs you measurable Sharpe.
+</div>
+
+<h2 id="s5">5. Reading dual values</h2>
+
+<p>The Lagrange multiplier $\lambda_i^\star$ on constraint $i$ is the <strong>shadow price</strong>: by how much would the optimal objective improve if you relaxed the constraint by one unit? In portfolio terms, if your sector cap binds at 30% with $\lambda^\star = 0.005$, then loosening the cap by 1% would add 5 basis points of utility.</p>
+
+<p>This is how risk teams price the cost of mandate restrictions. Run the unconstrained optimisation, then the constrained one. The difference in objective, attributed to each constraint via its dual multiplier, is the cost of compliance.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy):</strong> MS strategies are typically built signal-by-signal with simple constraints (vol target, signal cap at $\pm 2$ SD, sigmoid sizing). They almost never run a full constrained QP because the input vector $\mu$ is too noisy to justify the complexity. The rare exceptions: when implementing for a regulated entity with mandate constraints (sector caps, ESG tilts, country limits), they wrap the existing signal weights with a tracking-error-minimising overlay. Lesson 25 covers this pattern.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 Why long-only constraints make the problem strictly harder</h3>
+<p>Without $w \ge 0$, the closed-form Markowitz solution is one matrix-vector product. With $w \ge 0$, the active set is unknown a priori, and the problem becomes a quadratic program with no closed form. Solvers iterate to identify the active set. At each interior-point iteration, the cost is $O(N^3)$ for an $N$-asset universe.</p>
+
+<h3>6.2 The dual of mean-variance</h3>
+<p>For Markowitz with budget constraint, the dual problem maximises $- (1/2 \lambda) (\mu - \kappa \mathbf{1})^\top \Sigma^{-1} (\mu - \kappa \mathbf{1}) + \kappa$ over the scalar $\kappa$. The optimal $\kappa^\star$ has economic meaning: it is the "risk premium" required to make the budget binding.</p>
+
+<h3>6.3 Slater's condition for portfolios</h3>
+<p>Strong duality holds if there exists a strictly feasible point. For most portfolio problems this is trivial: the equal-weight portfolio $\mathbf{1}/N$ is strictly inside any reasonable feasible set. Strong duality lets us move freely between primal (weights) and dual (shadow prices) views.</p>
+
+<h3>6.4 KKT for variance minimisation under a return target</h3>
+<p>Minimise $w^\top \Sigma w$ subject to $w^\top \mu = \mu_p$ and $\mathbf{1}^\top w = 1$. KKT gives</p>
+<div class="formula">$$2 \Sigma w - \nu_1 \mu - \nu_2 \mathbf{1} = 0$$</div>
+<p>so $w = (1/2) \Sigma^{-1} (\nu_1 \mu + \nu_2 \mathbf{1})$. The multipliers $\nu_1, \nu_2$ are pinned by the two equality constraints. Solving the resulting 2x2 linear system gives the closed form for the efficient frontier (see Lesson 5 math companion 6.1).</p>
+
+<h3>6.5 Conic programming preview</h3>
+<p>Tracking-error budgets ($w^\top \Sigma w \le \text{TE}^2$) make the problem a second-order cone program (SOCP). CVaR optimisation (Lesson 16) is a linear program (LP). HRP and risk-parity (Lessons 14 to 15) are convex but not always quadratic. The general label "convex optimisation" covers all of these. Modern solvers (MOSEK, ECOS, SCS) handle the generic case.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+
+<h3>Exercise A: Constrained Markowitz with cvxpy</h3>
+<pre><code>import cvxpy as cp
+
+def constrained_mv(mu, Sigma, lam, long_only=True, max_pos=0.4, leverage=1.5):
+    n = len(mu)
+    w = cp.Variable(n)
+    obj = cp.Maximize(mu @ w - 0.5 * lam * cp.quad_form(w, Sigma))
+    cons = [cp.sum(w) == 1, w &lt;= max_pos]
+    if long_only:
+        cons.append(w &gt;= 0)
+    else:
+        cons.append(cp.norm(w, 1) &lt;= leverage)
+    prob = cp.Problem(obj, cons)
+    prob.solve()
+    return w.value, [c.dual_value for c in cons]
+</code></pre>
+
+<h3>Exercise B: Read dual values</h3>
+<p>Solve constrained MV. Print dual values. Identify which constraint is binding (large positive dual). Compare to constraint values at the optimum.</p>
+
+<h3>Exercise C: The cost of long-only</h3>
+<p>Run constrained vs unconstrained MV on the same universe. Report the Sharpe loss from imposing long-only. Typical loss: 5 to 30 bp of Sharpe for a 10-asset DM equity universe.</p>
+
+<h3>Exercise D: Sector neutrality</h3>
+<p>Add equality constraint $\sum_{i \in S} w_i = b_S$ for each sector. Use a benchmark like S&amp;P 500 GICS sector weights as $b_S$. Solve. Report the active sector exposures of the optimum vs the benchmark.</p>
+
+<h3>Exercise E: Plot the frontier under varying constraints</h3>
+<p>Plot 4 frontiers on the same axes: unconstrained, long-only, long-only + 30% cap, long-only + 30% cap + leverage 1.0. Watch each frontier strictly nest inside the previous.</p>
+
+<h2 id="s_test">8. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why must $\lambda_i \ge 0$ for inequality constraints in KKT, but $\nu_j$ can be any sign for equality constraints?</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise A to add a turnover constraint $\|w - w_{\text{old}}\|_1 \le 0.20$. Hint: <code>cp.norm(w - w_old, 1)</code>.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For a 3-asset problem with $\mu = [0.10, 0.05, 0.04]$, $\sigma = [0.20, 0.10, 0.05]$, all $\rho = 0.2$, $\lambda = 5$, find: (a) unconstrained weights, (b) long-only weights, (c) the Sharpe loss from long-only.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_05_markowitz.html">← Lesson 5</a></span>
+  <span><a href="lesson_07_risk_budgeting.html">Next: Lesson 7, Risk budgeting →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+      throwOnError: false
+    });
+  }
+});
+
+// Universe (4 assets to keep demo light)
+const N = 4;
+const mu_base = [0.08, 0.04, 0.06, 0.10];
+const sigma_v = [0.15, 0.05, 0.18, 0.20];
+const rho = [
+  [1.0, -0.2, 0.1, 0.7],
+  [-0.2, 1.0, 0.0, -0.1],
+  [0.1, 0.0, 1.0, 0.2],
+  [0.7, -0.1, 0.2, 1.0],
+];
+const asset_names = ['SPY', 'AGG', 'GLD', 'EM Eq'];
+
+function buildSigma() {
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(sigma_v[i] * sigma_v[j] * rho[i][j]);
+    S.push(r);
+  }
+  return S;
+}
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+// Projected gradient descent for constrained QP: max mu' w - (lam/2) w' Sigma w
+// subject to sum(w) = 1, w <= cap, optionally w >= 0
+function constrainedMV(mu, Sigma, lam, longOnly, cap) {
+  let w = mu.map(() => 1 / N);
+  const lr = 0.01;
+  for (let it = 0; it < 1500; it++) {
+    const grad = mu.map((m, i) => m - lam * matVec(Sigma, w)[i]);
+    w = w.map((wi, i) => wi + lr * grad[i]);
+    // Project: clip to [low, cap]
+    const low = longOnly ? 0 : -1;
+    w = w.map(wi => Math.min(cap, Math.max(low, wi)));
+    // Renormalise to sum 1 (project onto simplex slice)
+    const s = w.reduce((a, b) => a + b, 0);
+    if (Math.abs(s) > 1e-9) w = w.map(wi => wi / s);
+  }
+  return w;
+}
+
+function activeCount(w, longOnly, cap, tol = 1e-3) {
+  let n = 0;
+  for (const wi of w) {
+    if (Math.abs(wi - cap) < tol) n++;
+    if (longOnly && wi < tol) n++;
+  }
+  return n;
+}
+
+function updateLesson6() {
+  const lam = parseFloat(document.getElementById('lam').value);
+  const longOnly = document.getElementById('long_only').value === '1';
+  const cap = parseFloat(document.getElementById('cap').value);
+  const shift = parseFloat(document.getElementById('shift').value) / 10000;
+  document.getElementById('lam_v').textContent = lam.toFixed(2);
+  document.getElementById('long_v').textContent = longOnly ? 'on' : 'off';
+  document.getElementById('cap_v').textContent = cap.toFixed(2);
+  document.getElementById('shift_v').textContent = (shift * 10000).toFixed(0);
+
+  const mu = mu_base.slice(); mu[0] += shift;
+  const Sigma = buildSigma();
+
+  // Unconstrained frontier
+  const lamGrid = [];
+  for (let l = 0.5; l <= 30; l += 0.5) lamGrid.push(l);
+  const front_unc_x = [], front_unc_y = [];
+  const front_con_x = [], front_con_y = [];
+  for (const l of lamGrid) {
+    const w_unc = constrainedMV(mu, Sigma, l, false, 10);
+    front_unc_x.push(Math.sqrt(dot(w_unc, matVec(Sigma, w_unc))));
+    front_unc_y.push(dot(w_unc, mu));
+    const w_con = constrainedMV(mu, Sigma, l, longOnly, cap);
+    front_con_x.push(Math.sqrt(dot(w_con, matVec(Sigma, w_con))));
+    front_con_y.push(dot(w_con, mu));
+  }
+
+  const w_curr = constrainedMV(mu, Sigma, lam, longOnly, cap);
+  const m = dot(w_curr, mu);
+  const v = dot(w_curr, matVec(Sigma, w_curr));
+  const sigma = Math.sqrt(Math.max(0, v));
+
+  document.getElementById('opt_mean').textContent = (m * 100).toFixed(2) + '%';
+  document.getElementById('opt_vol').textContent = (sigma * 100).toFixed(2) + '%';
+  document.getElementById('opt_sr').textContent = (m / sigma).toFixed(3);
+  document.getElementById('active_n').textContent = activeCount(w_curr, longOnly, cap);
+
+  Plotly.react('frontier_plot', [
+    { x: front_unc_x, y: front_unc_y, mode: 'lines', name: 'Unconstrained', line: { color: '#cbd5e0', width: 2, dash: 'dash' } },
+    { x: front_con_x, y: front_con_y, mode: 'lines', name: 'Constrained', line: { color: '#2b6cb0', width: 2.5 } },
+    { x: [sigma], y: [m], mode: 'markers', name: 'Current', marker: { size: 14, color: '#c53030', symbol: 'star' } }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Volatility' },
+    yaxis: { title: 'Expected return' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+
+  Plotly.react('weights_plot', [
+    { x: asset_names, y: w_curr, type: 'bar', marker: { color: w_curr.map(wi => wi >= 0 ? '#2b6cb0' : '#c53030') } }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 40 },
+    xaxis: { title: '' },
+    yaxis: { title: 'Weight' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['lam', 'long_only', 'cap', 'shift'].forEach(id => document.getElementById(id).addEventListener('input', updateLesson6));
+updateLesson6();
+</script>
+
+</body>
+</html>

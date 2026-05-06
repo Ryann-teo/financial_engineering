@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 8: Sharpe Statistics and the Deflated Sharpe Ratio</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 8: Sharpe Statistics and the Deflated Sharpe Ratio</h1>
+<p class="subtitle">Module B, Week 2, Lesson 8. The Sharpe ratio is a statistic with a sampling distribution. Treat it as a point estimate and you will be fooled.</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">The Sharpe ratio</a></li>
+    <li><a href="#s2">The sampling distribution of estimated Sharpe</a></li>
+    <li><a href="#s3">The Probabilistic Sharpe Ratio</a></li>
+    <li><a href="#s4">The Deflated Sharpe Ratio</a></li>
+    <li><a href="#s5">Sharpe alternatives: Sortino, Calmar, IR</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+
+<h3>True Sharpe ratio</h3>
+<p>The "ground truth" Sharpe of the underlying strategy. In real life you never know this; the whole point of statistics is to estimate it from data. In the demos here we set it explicitly so we can see the gap between truth and observation.</p>
+
+<h3>Sample size $T$</h3>
+<p>Number of monthly observations used to estimate the Sharpe. 60 = 5 years. 120 = 10 years. 240 = 20 years. The standard error of an estimated Sharpe scales roughly as $1/\sqrt{T}$.</p>
+
+<h3>Number of trials $N$</h3>
+<p>How many strategies were tested in the search process. If you grid-search 10 hyperparameters with 5 values each, $N = 5^{10} \approx 10^7$. The Deflated Sharpe Ratio penalises by $\log N$.</p>
+
+<h3>Skew and excess kurtosis</h3>
+<p>Higher moments of the return distribution. Affect the variance of the Sharpe estimator. Negative skew or high kurtosis inflates the standard error of $\hat{SR}$.</p>
+
+<h2 id="s1">1. The Sharpe ratio</h2>
+<p>The standard reward-risk metric:</p>
+<div class="formula">$$\text{SR} = \frac{\mathbb{E}[r] - r_f}{\sigma(r)}$$</div>
+<p>Annualised. Period choice matters: a daily Sharpe of 0.06 annualises to about $0.06 \cdot \sqrt{252} \approx 0.95$ under independence.</p>
+
+<p>Three things to remember about Sharpe.</p>
+<p><strong>1. It is a population parameter.</strong> The true mean and true volatility are unknown. The reported number is always an estimate.</p>
+<p><strong>2. It assumes finite variance and stationarity.</strong> If returns have infinite variance (Cauchy-like), Sharpe is meaningless. If the regime shifts, the Sharpe of one regime tells you little about the next.</p>
+<p><strong>3. The square-root-of-time annualisation requires independence.</strong> When returns are autocorrelated, the annualised Sharpe is biased. Lo (2002) gives the autocorrelation-adjusted formula.</p>
+
+<h2 id="s2">2. The sampling distribution of estimated Sharpe</h2>
+<p>For IID Gaussian returns, Lo (2002) shows that the estimated Sharpe satisfies asymptotically:</p>
+<div class="formula">$$\hat{\text{SR}} \sim \mathcal{N}\left(\text{SR}, \frac{1 + \text{SR}^2 / 2}{T}\right)$$</div>
+<p>So the standard error is</p>
+<div class="formula">$$\text{SE}(\hat{\text{SR}}) \approx \sqrt{\frac{1 + \text{SR}^2 / 2}{T}}$$</div>
+<p>For $T = 60$ months and true SR = 1.0, the SE is $\sqrt{(1 + 0.5) / 60} \approx 0.16$. A 95% confidence interval is roughly $\hat{\text{SR}} \pm 0.31$. So a reported Sharpe of 1.0 from 5 years of monthly data could correspond to a true Sharpe anywhere from 0.7 to 1.3.</p>
+
+<p>For non-Gaussian returns, Mertens (2002) gives the more general formula incorporating skew and kurtosis. The variance of $\hat{\text{SR}}$ is inflated by negative skew and excess kurtosis.</p>
+
+<h3>Live: the noisy Sharpe</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>True Sharpe: <span class="value" id="tsr_v">1.00</span></label>
+      <input type="range" id="tsr" min="0" max="2.5" step="0.05" value="1.0">
+    </div>
+    <div class="control">
+      <label>Sample size $T$ (months): <span class="value" id="t_v">60</span></label>
+      <input type="range" id="T" min="12" max="500" step="6" value="60">
+    </div>
+    <div class="control">
+      <label>Skew: <span class="value" id="sk_v">0</span></label>
+      <input type="range" id="sk" min="-2" max="2" step="0.1" value="0">
+    </div>
+    <div class="control">
+      <label>Excess kurtosis: <span class="value" id="kt_v">0</span></label>
+      <input type="range" id="kt" min="0" max="10" step="0.5" value="0">
+    </div>
+  </div>
+  <div id="sharpe_dist_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>SE of $\hat{\text{SR}}$</span><span class="stat-value" id="se">0</span></div>
+    <div class="stat"><span>95% CI half-width</span><span class="stat-value" id="ci">0</span></div>
+    <div class="stat"><span>P($\hat{\text{SR}}$ &gt; 0)</span><span class="stat-value" id="p_pos">0</span></div>
+    <div class="stat"><span>P($\hat{\text{SR}}$ &gt; 1)</span><span class="stat-value" id="p_one">0</span></div>
+  </div>
+</div>
+
+<h2 id="s3">3. The Probabilistic Sharpe Ratio</h2>
+<p>Bailey and Lopez de Prado (2012) define</p>
+<div class="formula">$$\text{PSR}(\text{SR}^*) = \Phi\left(\frac{(\hat{\text{SR}} - \text{SR}^*) \sqrt{T - 1}}{\sqrt{1 - \hat{\gamma}_3 \hat{\text{SR}} + \tfrac{\hat{\gamma}_4 - 1}{4} \hat{\text{SR}}^2}}\right)$$</div>
+<p>where $\hat{\gamma}_3$ is sample skew, $\hat{\gamma}_4$ is sample kurtosis (not excess), and $\Phi$ is the standard normal CDF. The PSR is the probability that the true Sharpe exceeds a benchmark $\text{SR}^*$, given your sample. PSR &gt; 0.95 is the usual "real strategy" bar.</p>
+
+<h2 id="s4">4. The Deflated Sharpe Ratio</h2>
+<p>If you tried $N$ strategies and reported the best one, your "best" Sharpe is biased upward by selection. The DSR adjusts:</p>
+<div class="formula">$$\text{DSR} = \text{PSR}\left(\mathbb{E}[\max_n \hat{\text{SR}}_n \mid \text{SR}_n = 0]\right)$$</div>
+<p>The benchmark $\text{SR}^*$ is now the expected maximum across $N$ trials under the null hypothesis that all $N$ strategies have zero true Sharpe. From extreme value theory:</p>
+<div class="formula">$$\mathbb{E}[\max_n \hat{\text{SR}}_n \mid \text{null}] \approx \frac{(1 - \gamma) \Phi^{-1}(1 - 1/N) + \gamma \Phi^{-1}(1 - 1/(N e))}{\sqrt{T}}$$</div>
+<p>where $\gamma \approx 0.5772$ is the Euler-Mascheroni constant. This rises like $\sqrt{2 \log N / T}$, the classical extreme-value scaling.</p>
+
+<h3>Live: best of N noise strategies</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Number of trials $N$: <span class="value" id="N_v">100</span></label>
+      <input type="range" id="N" min="1" max="10000" step="50" value="100">
+    </div>
+    <div class="control">
+      <label>True Sharpe (best): <span class="value" id="tsr2_v">0.50</span></label>
+      <input type="range" id="tsr2" min="0" max="2" step="0.05" value="0.5">
+    </div>
+    <div class="control">
+      <label>Sample size $T$: <span class="value" id="T2_v">60</span></label>
+      <input type="range" id="T2" min="24" max="500" step="6" value="60">
+    </div>
+  </div>
+  <div id="dsr_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Expected max Sharpe under null</span><span class="stat-value" id="emax">0</span></div>
+    <div class="stat"><span>Required Sharpe for DSR = 0.95</span><span class="stat-value" id="threshold">0</span></div>
+    <div class="stat"><span>Is true Sharpe enough?</span><span class="stat-value" id="enough">?</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide $N$ from 1 to 10000.</strong> The expected max Sharpe under the null rises with $\sqrt{\log N}$. By $N = 1000$, even a true-Sharpe-zero strategy will look like it has Sharpe 0.5 to 0.8 in the best of 1000 trials. The DSR is brutal but honest.
+</div>
+
+<h2 id="s5">5. Sortino, Calmar, Information Ratio</h2>
+<p><strong>Sortino ratio</strong>: replace volatility with downside deviation. $\text{Sortino} = (\bar r - r_f) / \sqrt{\mathbb{E}[\min(r, 0)^2]}$. Useful when the return distribution is asymmetric (negative skew).</p>
+<p><strong>Calmar ratio</strong>: annualised return divided by max drawdown. Used in CTAs and managed futures, where path-dependent risk matters more than vol.</p>
+<p><strong>Information ratio</strong>: like Sharpe but applied to active returns vs a benchmark. $\text{IR} = (\bar r - \bar r_b) / \sigma(r - r_b)$. Used for benchmark-relative mandates.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 50, 65, 204):</strong> The MS protocol for evaluating a signal does NOT lead with Sharpe. It leads with the predictive correlation (signal vs forward return), then accuracy/hit rate, then naive PnL ratio. Sharpe is reported but never trusted as a single number. Article 204 ("Systematic trading strategies fooled by live records") quantifies how much in-sample Sharpe overstates live Sharpe across the MS catalog: a 30 to 50% degradation is typical. That gap is exactly what DSR is designed to predict and reject.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 Why the standard error of Sharpe scales as $1/\sqrt{T}$</h3>
+<p>Both $\hat \mu$ and $\hat \sigma$ are sample moments with standard errors $\sigma/\sqrt{T}$ and $\sigma/\sqrt{2T}$ respectively. The Sharpe is the ratio. By the delta method, $\text{Var}(\hat{\text{SR}}) = (1 + \text{SR}^2 / 2) / T$ for IID Gaussian returns. The "1" term comes from the mean estimation error; the "$\text{SR}^2 / 2$" term comes from the volatility estimation error.</p>
+
+<h3>6.2 Mertens (2002) for non-Gaussian returns</h3>
+<p>$\text{Var}(\hat{\text{SR}}) = (1 - \gamma_3 \text{SR} + \tfrac{\gamma_4 - 1}{4} \text{SR}^2) / T$ where $\gamma_3$ is skew and $\gamma_4$ is kurtosis (not excess). Negative skew adds variance because $\gamma_3 \text{SR} &lt; 0$, so the term $-\gamma_3 \text{SR} &gt; 0$. High kurtosis adds variance through the $\text{SR}^2$ coefficient.</p>
+
+<h3>6.3 The expected max Sharpe under the null</h3>
+<p>For $N$ IID standard normal random variables, the expected maximum is approximately $\Phi^{-1}(1 - 1/N) + \gamma \cdot \phi(\Phi^{-1}(1 - 1/N))^{-1}$. For large $N$, this grows as $\sqrt{2 \log N}$. Translated to Sharpe space (divide by $\sqrt{T}$), the bias grows as $\sqrt{2 \log N / T}$.</p>
+
+<h3>6.4 Why the DSR uses PSR not raw normal</h3>
+<p>The DSR is the PSR evaluated at the bias-corrected benchmark. This is more robust than naive z-scoring because PSR accounts for higher moments of the return distribution.</p>
+
+<h3>6.5 Annualisation under autocorrelation</h3>
+<p>For a return process with first-order autocorrelation $\rho$, the variance of the $T$-period sum is</p>
+<div class="formula">$$\text{Var}(\sum_{t=1}^T r_t) = T \sigma^2 \cdot q(T, \rho), \quad q(T, \rho) = 1 + 2 \sum_{k=1}^{T-1} (1 - k/T) \rho^k$$</div>
+<p>So the annualised Sharpe is $\hat{\text{SR}}_{\text{annual}} = \hat{\text{SR}}_{\text{period}} \cdot \sqrt{T / q(T, \rho)}$. For $\rho = 0.2$ and monthly data, $q \approx 1.5$. The naive annualisation overstates the Sharpe by roughly 25%. This is why bond Sharpes look better than they are.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+
+<h3>Exercise A: Sharpe with confidence interval</h3>
+<pre><code>import numpy as np
+def sharpe_with_ci(returns, T_per_year=12):
+    mu = returns.mean() * T_per_year
+    sigma = returns.std(ddof=1) * np.sqrt(T_per_year)
+    sr = mu / sigma
+    se = np.sqrt((1 + 0.5 * sr**2) / len(returns))
+    return {'sr': sr, 'se': se, 'ci_low': sr - 1.96 * se, 'ci_high': sr + 1.96 * se}</code></pre>
+
+<h3>Exercise B: Probabilistic Sharpe Ratio</h3>
+<pre><code>from scipy.stats import norm, skew, kurtosis
+
+def psr(returns, sr_benchmark=0):
+    sr = returns.mean() / returns.std(ddof=1)
+    T = len(returns)
+    s = skew(returns)
+    k = kurtosis(returns, fisher=False)  # not excess
+    z = (sr - sr_benchmark) * np.sqrt(T - 1) / np.sqrt(1 - s * sr + (k - 1) / 4 * sr**2)
+    return float(norm.cdf(z))</code></pre>
+
+<h3>Exercise C: Deflated Sharpe Ratio</h3>
+<pre><code>def expected_max_sr(N, T):
+    gamma = 0.5772
+    z1 = norm.ppf(1 - 1/N)
+    z2 = norm.ppf(1 - 1/(N * np.e))
+    return ((1 - gamma) * z1 + gamma * z2) / np.sqrt(T)
+
+def dsr(returns, N_trials):
+    sr = returns.mean() / returns.std(ddof=1)
+    benchmark = expected_max_sr(N_trials, len(returns))
+    return psr(returns, sr_benchmark=benchmark)</code></pre>
+
+<h3>Exercise D: Sortino, Calmar, IR</h3>
+<p>Implement all three for a return series with a benchmark. Compare across SPY, AGG, and a 60/40 mix.</p>
+
+<h3>Exercise E: Bootstrap confidence interval for Sharpe</h3>
+<pre><code>def bootstrap_sr_ci(returns, n_boot=10000):
+    n = len(returns)
+    srs = np.array([
+        np.random.choice(returns.values, size=n, replace=True).mean() /
+        np.random.choice(returns.values, size=n, replace=True).std(ddof=1)
+        for _ in range(n_boot)
+    ])
+    return np.percentile(srs, [2.5, 97.5])</code></pre>
+
+<h2 id="s_test">8. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does negative skew increase the standard error of the Sharpe ratio? Hint: think about which moments enter the variance estimator.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>You ran 200 strategy variants and the best one has Sharpe 1.2 over 5 years of monthly data. Compute the DSR. Is this strategy "real"?</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For true SR = 1.0, $T = 60$ months, what is the 95% CI for $\hat{\text{SR}}$? Compute by hand using the Lo formula. Compare to the Mertens formula for $\text{skew} = -0.5, \text{excess kurtosis} = 5$.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_07_risk_budgeting.html">← Lesson 7</a></span>
+  <span>Module B complete. Lessons 9 onward to be built.</span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+      throwOnError: false
+    });
+  }
+});
+
+function normPdf(z) { return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI); }
+function normCdf(z) {
+  // Abramowitz-Stegun approximation
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = normPdf(z);
+  let p = d * (0.319381530 * t - 0.356563782 * t**2 + 1.781477937 * t**3 - 1.821255978 * t**4 + 1.330274429 * t**5);
+  return z >= 0 ? 1 - p : p;
+}
+function normInv(p) {
+  // Beasley-Springer-Moro
+  const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924];
+  const b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857];
+  const c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878];
+  const d = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+  const pLow = 0.02425, pHigh = 1 - pLow;
+  let q, r;
+  if (p < pLow) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  if (p <= pHigh) { q = p - 0.5; r = q*q; return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1); }
+  q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+function linspace(a, b, n) { const out = []; for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1)); return out; }
+
+function update8a() {
+  const tsr = parseFloat(document.getElementById('tsr').value);
+  const T = parseInt(document.getElementById('T').value);
+  const sk = parseFloat(document.getElementById('sk').value);
+  const kt = parseFloat(document.getElementById('kt').value);
+  document.getElementById('tsr_v').textContent = tsr.toFixed(2);
+  document.getElementById('t_v').textContent = T;
+  document.getElementById('sk_v').textContent = sk.toFixed(1);
+  document.getElementById('kt_v').textContent = kt.toFixed(1);
+
+  // Mertens variance: (1 - sk*tsr + ((kt+3)-1)/4 * tsr^2) / T   (kt is excess; total kurt = kt + 3)
+  const var_sr = Math.max(0.001, (1 - sk * tsr + (kt + 2) / 4 * tsr * tsr) / T);
+  const se = Math.sqrt(var_sr);
+  const ci = 1.96 * se;
+  const p_pos = 1 - normCdf((0 - tsr) / se);
+  const p_one = 1 - normCdf((1 - tsr) / se);
+
+  document.getElementById('se').textContent = se.toFixed(3);
+  document.getElementById('ci').textContent = ci.toFixed(3);
+  document.getElementById('p_pos').textContent = (p_pos * 100).toFixed(1) + '%';
+  document.getElementById('p_one').textContent = (p_one * 100).toFixed(1) + '%';
+
+  const grid = linspace(tsr - 4 * se, tsr + 4 * se, 200);
+  const pdf = grid.map(x => normPdf((x - tsr) / se) / se);
+
+  Plotly.react('sharpe_dist_plot', [
+    { x: grid, y: pdf, mode: 'lines', fill: 'tozeroy', line: { color: '#2b6cb0', width: 2 }, name: 'Density of $\\hat{SR}$' },
+    { x: [tsr, tsr], y: [0, Math.max(...pdf)], mode: 'lines', line: { color: '#22543d', width: 2, dash: 'dash' }, name: 'True SR' },
+    { x: [tsr - ci, tsr - ci], y: [0, Math.max(...pdf)], mode: 'lines', line: { color: '#c05621', width: 1.5, dash: 'dot' }, name: '95% CI low' },
+    { x: [tsr + ci, tsr + ci], y: [0, Math.max(...pdf)], mode: 'lines', line: { color: '#c05621', width: 1.5, dash: 'dot' }, name: '95% CI high' }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Estimated $\\hat{SR}$' },
+    yaxis: { title: 'Density' },
+    legend: { orientation: 'h', y: -0.2 }
+  }, { displayModeBar: false });
+}
+['tsr', 'T', 'sk', 'kt'].forEach(id => document.getElementById(id).addEventListener('input', update8a));
+update8a();
+
+function update8b() {
+  const N = parseInt(document.getElementById('N').value);
+  const tsr2 = parseFloat(document.getElementById('tsr2').value);
+  const T2 = parseInt(document.getElementById('T2').value);
+  document.getElementById('N_v').textContent = N;
+  document.getElementById('tsr2_v').textContent = tsr2.toFixed(2);
+  document.getElementById('T2_v').textContent = T2;
+
+  function expectedMaxSR(N, T) {
+    const gamma = 0.5772;
+    const z1 = normInv(1 - 1 / N);
+    const z2 = normInv(1 - 1 / (N * Math.E));
+    return ((1 - gamma) * z1 + gamma * z2) / Math.sqrt(T);
+  }
+  const Ngrid = [];
+  for (let n = 1; n <= 10000; n = Math.max(n + 1, Math.ceil(n * 1.1))) Ngrid.push(n);
+  const emax = Ngrid.map(n => expectedMaxSR(n, T2));
+
+  const cur_emax = expectedMaxSR(N, T2);
+  // Required SR for DSR > 0.95 (approximate via PSR with sk = 0, kt = 3)
+  const sePsr = Math.sqrt((1 - 0 * tsr2 + (3 - 1) / 4 * tsr2 * tsr2) / (T2 - 1));
+  const required = cur_emax + normInv(0.95) * sePsr;
+  const enough = tsr2 > required;
+
+  document.getElementById('emax').textContent = cur_emax.toFixed(3);
+  document.getElementById('threshold').textContent = required.toFixed(3);
+  document.getElementById('enough').textContent = enough ? '✓ yes' : '✗ no';
+  document.getElementById('enough').style.color = enough ? '#22543d' : '#c53030';
+
+  Plotly.react('dsr_plot', [
+    { x: Ngrid, y: emax, mode: 'lines', name: 'Expected max Sharpe under null', line: { color: '#c53030', width: 2 } },
+    { x: [N], y: [cur_emax], mode: 'markers', name: 'Current N', marker: { size: 12, color: '#2b6cb0' } },
+    { x: Ngrid, y: Ngrid.map(_ => tsr2), mode: 'lines', name: 'True Sharpe', line: { color: '#22543d', width: 2, dash: 'dash' } }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Number of trials N', type: 'log' },
+    yaxis: { title: 'Sharpe' },
+    legend: { orientation: 'h', y: -0.2 }
+  }, { displayModeBar: false });
+}
+['N', 'tsr2', 'T2'].forEach(id => document.getElementById(id).addEventListener('input', update8b));
+update8b();
+</script>
+
+</body>
+</html>

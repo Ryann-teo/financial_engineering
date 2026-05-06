@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.ipynb_checkpoints/
+*.test
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Marimo cache
+__marimo__/
+
+# Personal notes (uncomment to keep them private)
+# lesson_*_notes.md

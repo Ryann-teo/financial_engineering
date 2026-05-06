@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 3: Risk Measures from Variance to Drawdown</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg: #fafbfc; --fg: #1a202c; --muted: #4a5568;
+    --primary: #2b6cb0; --accent: #c05621;
+    --card: #fff; --border: #e2e8f0;
+    --insight: #fffbea; --insight-border: #f59e0b;
+    --code-bg: #1a202c; --code-fg: #e2e8f0;
+    --demo-bg: #f7fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 920px; margin: 0 auto; padding: 2rem;
+    line-height: 1.65; color: var(--fg); background: var(--bg);
+  }
+  h1 { font-size: 2.1rem; color: var(--primary); margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: var(--accent); margin-top: 2rem; }
+  p { margin: 0.8rem 0; }
+  .toc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.5rem; margin: 1.5rem 0;
+  }
+  .toc ol { margin: 0.4rem 0 0 0; padding-left: 1.4rem; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .demo {
+    background: var(--demo-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.5rem 0;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: var(--muted); font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .control select {
+    padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 0.95rem;
+  }
+  .value { font-family: 'JetBrains Mono', 'Courier New', monospace; color: var(--accent); font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight {
+    background: var(--insight); border-left: 4px solid var(--insight-border);
+    padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0;
+  }
+  .formula {
+    background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0;
+    border-left: 3px solid var(--primary);
+  }
+  code { background: var(--code-bg); color: var(--code-fg); padding: 0.1rem 0.4rem;
+         border-radius: 3px; font-size: 0.88em; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  pre {
+    background: var(--code-bg); color: var(--code-fg); padding: 1rem 1.2rem;
+    border-radius: 6px; overflow-x: auto; font-size: 0.88em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  .selftest {
+    background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px;
+    padding: 1rem 1.5rem; margin: 2rem 0;
+  }
+  .selftest h3 { color: var(--primary); margin-top: 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem;
+          background: white; border-radius: 4px; border: 1px solid var(--border); }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem;
+         border-top: 1px solid var(--border); color: var(--muted); }
+  .nav a { color: var(--primary); text-decoration: none; }
+  .axiom-box {
+    background: white; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.8rem 1rem; margin: 0.6rem 0;
+  }
+  .axiom-box strong { color: var(--primary); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 3: Risk Measures from Variance to Drawdown</h1>
+<p class="subtitle">Module A, Week 1, Lesson 3. Variance is one risk measure among many. Build VaR, CVaR, and drawdown from first principles, see why CVaR is the only coherent quantile-based measure, and learn when to use which.</p>
+
+<div class="toc">
+  <strong>What you will learn</strong>
+  <ol>
+    <li><a href="#s1">Why variance is not enough</a></li>
+    <li><a href="#s2">Value at Risk (VaR), the textbook quantile</a></li>
+    <li><a href="#s3">Conditional VaR (CVaR), the average past VaR</a></li>
+    <li><a href="#s4">Coherence: the four axioms of a real risk measure</a></li>
+    <li><a href="#s5">Why VaR fails sub-additivity (with a worked example)</a></li>
+    <li><a href="#s6">Drawdown, the path-dependent measure that matters</a></li>
+    <li><a href="#s7">Choosing the right measure for the right job</a></li>
+    <li><a href="#s8">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls: what every slider means</h2>
+
+<h3>Confidence level $\alpha$</h3>
+<p>The probability that a loss is at or below VaR. $\alpha = 0.95$ means "the loss I will not exceed on 95% of days". The complement, $1 - \alpha = 5\%$, is the tail mass we are pricing.</p>
+<p>Three industry-standard levels:</p>
+<ul>
+  <li><strong>$\alpha = 0.95$</strong> (one bad day in 20). Used in trading desks for daily P and L limits.</li>
+  <li><strong>$\alpha = 0.99$</strong> (one in 100). The Basel Committee VaR standard.</li>
+  <li><strong>$\alpha = 0.999$</strong> (one in 1000). Used for stressed-VaR and capital adequacy. Almost always combined with stress scenarios because the data sample is too small to estimate this level reliably.</li>
+</ul>
+<p>The slider goes from 0.80 to 0.999. As $\alpha \to 1$, your sample size effectively shrinks: at $\alpha = 0.999$ on 2520 days of data, you have only 2 to 3 observations in the tail. Estimates become unstable.</p>
+
+<h3>Sample size $n$</h3>
+<p>Number of daily observations. The standard error of an empirical quantile shrinks as $1 / \sqrt{n}$, but only after $n$ is large enough to actually contain enough tail observations. As a rule of thumb, $n \cdot (1 - \alpha) \ge 30$ for the empirical quantile to be reliable. At $\alpha = 0.99$, that means $n \ge 3000$ or roughly 12 years of daily data.</p>
+
+<h3>Distribution method</h3>
+<ul>
+  <li><strong>Historical.</strong> Empirical quantile of the observed losses. Non-parametric. Robust to model misspecification but suffers when the future does not look like the past.</li>
+  <li><strong>Gaussian fit.</strong> Estimate $\mu, \sigma$ from data, then compute VaR analytically as $-\mu + \sigma z_\alpha$. Smooth and stable. Catastrophically underestimates tail risk for fat-tailed assets.</li>
+  <li><strong>Student t fit.</strong> Estimate $\mu, \sigma, \text{df}$ from data, then compute VaR using the t quantile. The middle ground: parametric and stable, but flexible enough to capture heavy tails.</li>
+</ul>
+
+<h3>Asset profile parameters</h3>
+<p>Each asset profile uses a Student t with characteristic df: SPY df = 5, AGG df = 8, BTC df = 3, 60/40 mix df = 6. Lower df means heavier tails (see Section 9 below).</p>
+
+<h3>Default probability $p$ (counterexample demo)</h3>
+<p>The probability per period that a single bond defaults. We use this in the section that demonstrates VaR's failure of sub-additivity. The key insight: when $p$ sits in the interval $(1 - \alpha, \alpha)$, the bond's individual VaR is zero but the portfolio of two bonds has positive VaR. That is the sub-additivity violation.</p>
+
+<h3>Vol persistence $\beta$ (drawdown demo)</h3>
+<p>The GARCH persistence parameter. Same role as in Lesson 1. Higher $\beta$ creates longer vol clusters, which compound into deeper drawdowns even when $\mu$ and $\sigma$ are held constant. This is the cleanest empirical reason that drawdown is a path-dependent measure that distributional measures (variance, VaR, CVaR) miss.</p>
+
+<h3>Random seed (drawdown demo)</h3>
+<p>Same idea as Lesson 1. Each seed gives one realisation from the same probability law. Slide the seed and watch how max drawdown can vary by a factor of 2 to 3 across realisations of the same process. <strong>Drawdown is a single-path statistic with high sampling variance.</strong> One backtest's max drawdown is a noisy estimate of the true max drawdown distribution.</p>
+
+<h2 id="s1">1. Why variance is not enough</h2>
+<p>Variance treats upside and downside symmetrically. A 30% gain and a 30% loss contribute identically to $\sigma^2$. For a portfolio, this is rarely what you want. Investors care about <em>losses</em>, not deviations.</p>
+
+<p>Variance also gives no information about the tail shape. Two distributions can have identical variance and very different tail risk: a Gaussian with $\sigma = 10\%$ and a Student t with $\sigma = 10\%$, $\text{df} = 4$ have the same standard deviation but the t has roughly 3 times the probability mass beyond 3 sigma.</p>
+
+<p>The fix is to define risk measures that look directly at the loss distribution. We will build three: VaR, CVaR, and drawdown.</p>
+
+<h2 id="s2">2. Value at Risk</h2>
+<p>VaR is a quantile of the loss distribution. The 95% VaR is the loss you would not exceed on 95% of days. Formally:</p>
+<div class="formula">$$\text{VaR}_\alpha(L) = \inf\{x : P(L \le x) \ge \alpha\}$$</div>
+<p>where $L$ is the loss (positive numbers mean losses). This is just the $\alpha$-th quantile of $L$. If $\alpha = 0.95$, you are looking for the loss that exceeds 95% of all daily losses, i.e., the 5% worst tail boundary.</p>
+
+<p>Three common conventions: $\alpha = 0.95$ (one bad day in 20), $\alpha = 0.99$ (one in 100), $\alpha = 0.999$ (one in 1000, used in regulatory capital). The right choice depends on what you are reserving capital for.</p>
+
+<h3>Live: VaR as a quantile slider</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Asset profile: </label>
+      <select id="asset_pick">
+        <option value="spy">SPY (equity)</option>
+        <option value="agg">AGG (bonds)</option>
+        <option value="btc">BTC (crypto)</option>
+        <option value="6040">60/40 mix</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>Confidence $\alpha$: <span class="value" id="alpha_v">0.95</span></label>
+      <input type="range" id="alpha" min="0.80" max="0.999" step="0.001" value="0.95">
+    </div>
+    <div class="control">
+      <label>Sample size (days): <span class="value" id="n_v">2520</span></label>
+      <input type="range" id="n" min="500" max="6000" step="100" value="2520">
+    </div>
+  </div>
+  <div id="hist_plot" class="plot" style="height: 400px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">VaR$_\alpha$ (historical)</span><span class="stat-value" id="var_hist">0</span></div>
+    <div class="stat"><span class="stat-label">VaR$_\alpha$ (Gaussian fit)</span><span class="stat-value" id="var_gauss">0</span></div>
+    <div class="stat"><span class="stat-label">CVaR$_\alpha$ (historical)</span><span class="stat-value" id="cvar_hist">0</span></div>
+    <div class="stat"><span class="stat-label">Worst observation</span><span class="stat-value" id="worst">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide $\alpha$ from 0.95 to 0.99 to 0.999.</strong> The orange VaR line moves slowly. The red CVaR line moves <em>fast</em>. That is the central message: VaR tells you where the boundary of bad days starts. CVaR tells you the average severity once you cross the boundary. Two different questions with two different answers.
+</div>
+
+<h2 id="s3">3. Conditional VaR (CVaR)</h2>
+<p>CVaR, also called Expected Shortfall, is the average loss given that you are <em>past</em> the VaR threshold. Formally:</p>
+<div class="formula">$$\text{CVaR}_\alpha(L) = \mathbb{E}[L \mid L \ge \text{VaR}_\alpha(L)]$$</div>
+
+<p>For a continuous distribution this can be written as</p>
+<div class="formula">$$\text{CVaR}_\alpha(L) = \frac{1}{1 - \alpha} \int_\alpha^1 \text{VaR}_u(L) \, du$$</div>
+
+<p>which says CVaR is the average of all VaR levels above $\alpha$. Empirically, you compute it by averaging the worst $(1 - \alpha)$ fraction of losses.</p>
+
+<p>For a Gaussian loss with mean $\mu$ and standard deviation $\sigma$, CVaR has a closed form:</p>
+<div class="formula">$$\text{CVaR}^{\text{Gaussian}}_\alpha = \mu + \sigma \frac{\phi(z_\alpha)}{1 - \alpha}$$</div>
+
+<p>where $\phi$ is the standard normal density and $z_\alpha = \Phi^{-1}(\alpha)$. At $\alpha = 0.99$, the ratio CVaR / VaR is about 1.15 for a Gaussian. For a Student t with df = 4, the ratio rises to about 1.4. Heavy tails make CVaR much larger than VaR.</p>
+
+<h3>Live: VaR vs CVaR ratio across distributions</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Distribution: </label>
+      <select id="dist_pick">
+        <option value="norm">Normal</option>
+        <option value="t4">Student t (df=4)</option>
+        <option value="t6">Student t (df=6)</option>
+        <option value="t10">Student t (df=10)</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>$\alpha$ confidence: <span class="value" id="alpha2_v">0.99</span></label>
+      <input type="range" id="alpha2" min="0.90" max="0.999" step="0.001" value="0.99">
+    </div>
+  </div>
+  <div id="ratio_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">VaR$_\alpha$</span><span class="stat-value" id="r_var">0</span></div>
+    <div class="stat"><span class="stat-label">CVaR$_\alpha$</span><span class="stat-value" id="r_cvar">0</span></div>
+    <div class="stat"><span class="stat-label">CVaR / VaR ratio</span><span class="stat-value" id="r_ratio">0</span></div>
+  </div>
+</div>
+
+<h2 id="s4">4. Coherence: the four axioms</h2>
+<p>Artzner, Delbaen, Eber, and Heath (1999) proposed four axioms that any "real" risk measure should satisfy. Let $\rho$ denote a risk measure (positive numbers mean more risk).</p>
+
+<div class="axiom-box">
+  <strong>1. Monotonicity.</strong> If portfolio $X$ always loses at least as much as portfolio $Y$, then $\rho(X) \ge \rho(Y)$. Riskier portfolios have higher risk numbers.
+</div>
+<div class="axiom-box">
+  <strong>2. Translation invariance.</strong> $\rho(X + c) = \rho(X) - c$. Adding cash $c$ reduces risk one-for-one.
+</div>
+<div class="axiom-box">
+  <strong>3. Positive homogeneity.</strong> $\rho(\lambda X) = \lambda \rho(X)$ for $\lambda \ge 0$. Doubling exposure doubles risk.
+</div>
+<div class="axiom-box">
+  <strong>4. Sub-additivity.</strong> $\rho(X + Y) \le \rho(X) + \rho(Y)$. Combining portfolios cannot increase total risk. <em>Diversification cannot hurt.</em>
+</div>
+
+<p>A risk measure that satisfies all four is called <strong>coherent</strong>. Variance is not coherent (it fails translation invariance and positive homogeneity, although volatility $\sigma$ is positively homogeneous). VaR is not coherent in general (it fails sub-additivity). CVaR <em>is</em> coherent. This is the formal reason CVaR is preferred for portfolio optimisation.</p>
+
+<h2 id="s5">5. Why VaR fails sub-additivity, with a worked example</h2>
+<p>Here is a concrete two-portfolio example. Suppose each of two zero-coupon bonds has a 4% chance of defaulting. Each pays nothing if it defaults and \$100 if it does not. Losses (relative to the par value of \$100):</p>
+
+<ul>
+  <li>Bond A alone: $P(L = 100) = 0.04$, $P(L = 0) = 0.96$.</li>
+  <li>The 95% VaR of bond A is \$0 (the 5th percentile from the top of the loss distribution still falls in the no-default region).</li>
+</ul>
+
+<p>Same for bond B independently. Now combine them, equal weights, so each contributes \$50 to the portfolio:</p>
+
+<ul>
+  <li>Joint distribution under independence: $P(\text{neither defaults}) = 0.9216$, $P(\text{exactly one}) = 0.0768$, $P(\text{both}) = 0.0016$.</li>
+  <li>Loss of \$50 has probability 7.68%. Loss of \$100 has probability 0.16%.</li>
+  <li>The 95% VaR is now \$50 (since 7.68% of paths have a \$50 loss, this exceeds the 5% threshold).</li>
+</ul>
+
+<p>So $\text{VaR}_{0.95}(A) = 0$, $\text{VaR}_{0.95}(B) = 0$, but $\text{VaR}_{0.95}(A + B) = 50$. Sub-additivity is violated: combining two zero-VaR positions creates positive VaR. Diversification appears to <em>increase</em> risk under VaR. CVaR does not have this problem.</p>
+
+<h3>Live: the bond default counterexample</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Default probability per bond $p$: <span class="value" id="p_v">0.04</span></label>
+      <input type="range" id="p" min="0.01" max="0.10" step="0.005" value="0.04">
+    </div>
+    <div class="control">
+      <label>$\alpha$ confidence: <span class="value" id="alpha3_v">0.95</span></label>
+      <input type="range" id="alpha3" min="0.90" max="0.99" step="0.005" value="0.95">
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">VaR(A) alone</span><span class="stat-value" id="var_a">0</span></div>
+    <div class="stat"><span class="stat-label">VaR(B) alone</span><span class="stat-value" id="var_b">0</span></div>
+    <div class="stat"><span class="stat-label">VaR(A) + VaR(B)</span><span class="stat-value" id="var_sum">0</span></div>
+    <div class="stat"><span class="stat-label">VaR(A+B) combined</span><span class="stat-value" id="var_combined">0</span></div>
+    <div class="stat"><span class="stat-label">CVaR(A+B) combined</span><span class="stat-value" id="cvar_combined">0</span></div>
+    <div class="stat"><span class="stat-label">Sub-additivity satisfied?</span><span class="stat-value" id="sub_check">?</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide $p$ to 0.04 and $\alpha$ to 0.95.</strong> VaR fails. Slide $p$ down to 0.01: VaR is well behaved. The failure happens precisely when the default probability sits between $1 - \alpha$ and $\alpha$. This is not a pathological corner case. It happens whenever you combine assets with discrete tail events (credit, options, illiquid).
+</div>
+
+<h2 id="s6">6. Drawdown, the path-dependent measure</h2>
+<p>Variance, VaR, CVaR all look at the marginal distribution of returns. They ignore <em>order</em>. Drawdown is different. The drawdown at time $t$ is the percentage loss from the peak so far:</p>
+<div class="formula">$$\text{DD}_t = 1 - \frac{W_t}{\max_{s \le t} W_s}$$</div>
+
+<p>Maximum drawdown is the worst drawdown over the whole path:</p>
+<div class="formula">$$\text{MDD} = \max_t \text{DD}_t$$</div>
+
+<p>Drawdown matters for two reasons. <strong>Psychological</strong>: investors panic and redeem at large drawdowns. <strong>Mechanical</strong>: a 50% drawdown requires a 100% gain to recover, so deep drawdowns destroy compound growth even if average returns recover.</p>
+
+<p>Two return distributions with the same variance and same VaR can have wildly different drawdowns depending on the autocorrelation of negative returns. Volatility clustering (Lesson 1 stylised fact 2) is what makes real-market drawdowns so much worse than IID-Gaussian theory predicts.</p>
+
+<h3>Live: equity curve, drawdown, and recovery</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Annualised return $\mu$ (%): <span class="value" id="dd_mu_v">8</span></label>
+      <input type="range" id="dd_mu" min="-10" max="20" step="0.5" value="8">
+    </div>
+    <div class="control">
+      <label>Annualised vol $\sigma$ (%): <span class="value" id="dd_vol_v">15</span></label>
+      <input type="range" id="dd_vol" min="5" max="50" step="1" value="15">
+    </div>
+    <div class="control">
+      <label>Vol persistence (clustering): <span class="value" id="dd_beta_v">0.93</span></label>
+      <input type="range" id="dd_beta" min="0.50" max="0.99" step="0.01" value="0.93">
+    </div>
+    <div class="control">
+      <label>Years simulated: <span class="value" id="dd_years_v">10</span></label>
+      <input type="range" id="dd_years" min="3" max="30" step="1" value="10">
+    </div>
+    <div class="control">
+      <label>Random seed: <span class="value" id="dd_seed_v">7</span></label>
+      <input type="range" id="dd_seed" min="1" max="100" step="1" value="7">
+    </div>
+  </div>
+  <div id="dd_plot" class="plot" style="height: 480px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Max drawdown</span><span class="stat-value" id="mdd">0</span></div>
+    <div class="stat"><span class="stat-label">Recovery to break even (days)</span><span class="stat-value" id="rec">0</span></div>
+    <div class="stat"><span class="stat-label">Realised Sharpe</span><span class="stat-value" id="sharpe">0</span></div>
+    <div class="stat"><span class="stat-label">Calmar ratio (return / MDD)</span><span class="stat-value" id="calmar">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide vol persistence from 0.5 to 0.99.</strong> Same average return, same realised vol, but the maximum drawdown explodes as persistence rises. Clustered bad days compound into deeper drawdowns. This is the empirical reason traders care about regime detection (Lesson 27) and drawdown-aware optimisation (Lesson 16).
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 220, the canonical drawdown paper):</strong> MinMax drawdown control. The mechanic: scale portfolio leverage by an aversion parameter once rolling drawdown crosses a threshold (typically 10 to 15%). Parameterised by aversion to drawdown <em>types</em> (recent and shallow vs deep and prolonged), not by expected returns, which makes it robust to estimation error. Combined with vol targeting (Lesson 21), this is the standard Macrosynergy risk overlay. Empirically, applying MinMax to the flagship art 3 cross-asset strategy reduces max drawdown from 18% to 11% with only a 5% Sharpe loss. Drawdown control is one of the few risk frameworks that pays for itself.
+</div>
+
+<h2 id="s7">7. Choosing the right measure</h2>
+
+<p><strong>Use variance / volatility</strong> when you have many assets, returns are roughly Gaussian, and you need a smooth optimisable objective. Markowitz mean-variance (Lesson 5) requires it. Rebalancing frequencies of weekly to monthly with diversified exposure usually work.</p>
+
+<p><strong>Use VaR</strong> when regulators or risk-limit systems demand it. Most banks operate under VaR limits because of historical regulatory inertia. Be aware of its non-coherence and back-test exceedances.</p>
+
+<p><strong>Use CVaR</strong> for portfolio optimisation involving tail-sensitive assets: options, credit, illiquid private. The Rockafellar-Uryasev LP formulation (Lesson 16) makes this just as tractable as mean-variance.</p>
+
+<p><strong>Use maximum drawdown / Calmar / CDaR</strong> when investor behaviour matters: hedge fund redemptions, retail flows, career-risk for portfolio managers. Drawdowns drive funding behaviour even when statistical risk metrics look fine.</p>
+
+<p><strong>Use multiple measures together.</strong> Best practice in production risk systems is to compute all of them and flag any that breach a threshold. Each measure captures something the others miss.</p>
+
+<h3>Python translation</h3>
+<pre><code>import numpy as np
+
+def historical_var_cvar(losses, alpha=0.95):
+    """Empirical VaR and CVaR at confidence alpha."""
+    losses = np.asarray(losses)
+    var = np.quantile(losses, alpha)
+    cvar = losses[losses >= var].mean()
+    return {'var': var, 'cvar': cvar}
+
+def max_drawdown(equity):
+    """Max drawdown of an equity curve, plus dates."""
+    eq = np.asarray(equity)
+    peak = np.maximum.accumulate(eq)
+    dd = 1 - eq / peak
+    trough_i = int(np.argmax(dd))
+    peak_i = int(np.argmax(eq[:trough_i + 1]))
+    return {'max_dd': float(dd[trough_i]), 'peak_idx': peak_i, 'trough_idx': trough_i}
+
+def cdar(equity, alpha=0.95):
+    """Conditional drawdown at risk."""
+    eq = np.asarray(equity)
+    peak = np.maximum.accumulate(eq)
+    dd = 1 - eq / peak
+    threshold = np.quantile(dd, alpha)
+    tail = dd[dd >= threshold]
+    return float(tail.mean())</code></pre>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy production stack):</strong> Volatility targeting at the strategy level + MinMax drawdown control at the portfolio level. CVaR is computed for academic comparison and stress reporting but is rarely the primary optimisation objective. The reason is empirical: vol targets and drawdown stops respond fast to market changes (within a week of a regime shift), while a parametric CVaR depends on a fixed loss distribution that goes stale during regime transitions. The combined stack is documented in articles 5 (FX), 13 (EM trend), and 220 (drawdown), and applied implicitly in every published strategy. Lessons 21 and 16 in this curriculum build the two layers respectively.
+</div>
+
+<h2 id="s_math">8. Mathematical companion: derivations and proofs</h2>
+
+<h3>8.1 Why CVaR is sub-additive (and VaR is not)</h3>
+<p>Sub-additivity says $\rho(X + Y) \le \rho(X) + \rho(Y)$. For CVaR the proof rests on its representation as an average of quantiles:</p>
+<div class="formula">$$\text{CVaR}_\alpha(L) = \frac{1}{1 - \alpha} \int_\alpha^1 \text{VaR}_u(L) \, du$$</div>
+<p>And the dual representation</p>
+<div class="formula">$$\text{CVaR}_\alpha(L) = \sup_{Q \in \mathcal{Q}_\alpha} \mathbb{E}_Q[L]$$</div>
+<p>where $\mathcal{Q}_\alpha$ is a set of probability measures absolutely continuous with respect to the original, with bounded Radon-Nikodym derivative. CVaR is a supremum of linear functionals of the loss, and a supremum of sub-additive functionals is itself sub-additive.</p>
+<p>VaR fails because it picks a single quantile rather than averaging the tail. The two-bond example in Section 5 above is a literal counterexample. Mathematically, the failure is tied to the discontinuity of the indicator function $\mathbb{1}\{L \ge \text{VaR}\}$ in the loss distribution.</p>
+
+<h3>8.2 Translation invariance and "cash-additivity"</h3>
+<p>$\rho(X + c) = \rho(X) - c$ for any constant $c$. The interpretation: adding $c$ in cash to a portfolio reduces its risk by exactly $c$. This is what makes $\rho$ measure risk in monetary units. Without it, doubling cash would not halve risk in any meaningful way.</p>
+<p>Variance does not satisfy translation invariance: $\text{Var}(X + c) = \text{Var}(X)$. Adding cash leaves variance unchanged. This is one reason variance is not by itself a complete risk measure for capital adequacy purposes.</p>
+
+<h3>8.3 The acceptance set framework</h3>
+<p>Artzner et al. (1999) showed that any coherent risk measure can be written as</p>
+<div class="formula">$$\rho(X) = \inf\{m \in \mathbb{R} : X + m \in \mathcal{A}\}$$</div>
+<p>where $\mathcal{A}$ is a set of "acceptable" portfolios. The risk of $X$ is the smallest cash addition that makes $X$ acceptable. Different acceptance sets give different coherent measures. CVaR corresponds to "the average loss conditional on tail event must be no worse than $-c$". Worst-case scenario optimisation corresponds to "no path under any scenario worse than $-c$". This unifies many practical risk frameworks.</p>
+
+<h3>8.4 VaR backtesting (Kupiec and Christoffersen)</h3>
+<p>If your model says $\text{VaR}_\alpha = v$, you should observe losses exceeding $v$ on a fraction $1 - \alpha$ of days. Two formal tests:</p>
+<p><strong>Kupiec's POF test.</strong> Under the null hypothesis that the model is correct, the number of exceedances $N$ follows Binomial$(n, 1 - \alpha)$. The likelihood ratio test statistic</p>
+<div class="formula">$$LR_{\text{POF}} = -2 \ln\left(\frac{(1-\alpha)^N \alpha^{n-N}}{(N/n)^N (1 - N/n)^{n-N}}\right)$$</div>
+<p>follows a chi-squared with 1 df under the null. Reject if $LR > 3.84$ (95% level).</p>
+<p><strong>Christoffersen's IID test.</strong> Exceedances should be independent across days. If they cluster, you have a regime-detection problem on top of unconditional miscalibration.</p>
+<p>Combined test: Christoffersen (1998) gives a joint test of correct unconditional coverage and independence.</p>
+
+<h3>8.5 Drawdown vs distributional measures</h3>
+<p>Variance, VaR, CVaR all depend only on the marginal distribution of single-period returns. They are <strong>permutation-invariant</strong>: shuffle the order of returns, the metric is unchanged. Drawdown is not permutation-invariant. The same set of returns in different orders produces different drawdowns. The order matters because peaks and troughs depend on partial sums.</p>
+<p>Formally, drawdown is a functional of the equity curve $W_t = W_0 \prod_{s \le t}(1 + r_s)$, and any permutation of returns changes which partial sums are minima.</p>
+<p><strong>Practical consequence.</strong> A portfolio that loses 1% per day for 30 days has the same monthly variance as a portfolio that gains 1% per day for 15 days then loses 1% per day for 15 days. They have very different drawdowns. Volatility clustering (Lesson 1) makes the bad-day-clustering scenario likelier in real markets, which is why realised drawdowns exceed iid-Gaussian predictions.</p>
+
+<h3>8.6 The Calmar, Sterling, and Burke ratios</h3>
+<p>Drawdown-based reward-risk ratios. Each one normalises return by a different summary of the drawdown path.</p>
+<ul>
+  <li><strong>Calmar</strong> = annualised return / max drawdown. Most common.</li>
+  <li><strong>Sterling</strong> = annualised return / (average of $N$ largest drawdowns minus 10%). Smooths Calmar.</li>
+  <li><strong>Burke</strong> = annualised return / sqrt(sum of squared drawdowns). Penalises many medium drawdowns more than one large one.</li>
+</ul>
+<p>None are coherent risk measures in the Artzner sense, but they are widely used because they speak the language of investors who care about peak-to-trough pain.</p>
+
+<h3>8.7 Why do regulators prefer VaR over CVaR? (and the slow change)</h3>
+<p>For two decades, Basel II used VaR at 99% confidence. CVaR was known to be theoretically superior (coherent, captures tail expectation) but had practical disadvantages: harder to backtest with finite data, more sensitive to model assumptions, and less intuitive ("expected loss in the worst 1%" is a more abstract object than "the 99th percentile loss").</p>
+<p>Basel III, finalised in 2017 and rolled out 2023 to 2025, switches to <strong>Expected Shortfall</strong> (= CVaR) at 97.5% confidence. The 97.5% level for ES roughly matches the historical 99% VaR in normal markets but captures more of the tail in stress regimes. The lesson: regulatory practice catches up to academic theory, but slowly.</p>
+
+<h3>8.8 Connection to expected utility theory</h3>
+<p>Variance optimisation is justified by quadratic utility, which has the unwanted property of being non-monotone (more wealth eventually decreases utility, since $u(w) = w - \frac{a}{2}w^2$ has $u'(w) = 1 - aw$ negative for large $w$). This is one philosophical reason variance is not a satisfying risk measure for very wealthy or very poor investors.</p>
+<p>CVaR optimisation can be derived from non-expected-utility frameworks like Yaari's dual theory or rank-dependent expected utility. These value tail outcomes more than expected utility does, matching the observed behaviour of investors who buy insurance and worry about disasters.</p>
+
+<h2 id="s_code">9. Coding exercises (extras)</h2>
+<p>The companion notebook <code>module_a_exercises.ipynb</code> has 10 fully scaffolded fill-in-the-blank exercises for Lesson 3, plus three integrative bonus exercises. Five additional questions for direct practice below.</p>
+
+<h3>Exercise A: Filtered historical simulation VaR</h3>
+<p>The bridge between historical and parametric: standardise returns by their conditional volatility (from EWMA or GARCH), then sample from the standardised distribution and rescale by today's vol. Captures fat tails and clustering.</p>
+<pre><code>def filtered_historical_var(returns, alpha=0.99, ewma_lambda=0.94):
+    var_t = np.zeros(len(returns))
+    var_t[0] = returns.var(ddof=1)
+    for t in range(1, len(returns)):
+        var_t[t] = ewma_lambda * var_t[t-1] + (1 - ewma_lambda) * returns.iloc[t-1] ** 2
+    sigma_t = np.sqrt(var_t)
+    standardised = returns / sigma_t
+    quantile = np.quantile(-standardised, alpha)
+    return quantile * sigma_t[-1]</code></pre>
+
+<h3>Exercise B: Cornish-Fisher VaR</h3>
+<p>Adjust the Gaussian quantile for skew and kurtosis. Pragmatic middle ground between Gaussian and full historical.</p>
+<pre><code>def cornish_fisher_var(returns, alpha=0.99):
+    mu, sd = -returns.mean(), returns.std(ddof=1)
+    z = stats.norm.ppf(alpha)
+    s = stats.skew(returns)
+    k = stats.kurtosis(returns, fisher=True)
+    z_cf = z + (z**2 - 1) * s / 6 + (z**3 - 3*z) * k / 24 - (2*z**3 - 5*z) * s**2 / 36
+    return mu + sd * z_cf</code></pre>
+
+<h3>Exercise C: Christoffersen IID test for VaR exceedances</h3>
+<p>Tests independence: are exceedance days clustered? If yes, the model misses regime dynamics.</p>
+<pre><code>def christoffersen_iid_test(exceedances):
+    """exceedances: 1D boolean array indicating VaR breaches."""
+    n00 = n01 = n10 = n11 = 0
+    for t in range(1, len(exceedances)):
+        if not exceedances[t-1] and not exceedances[t]: n00 += 1
+        if not exceedances[t-1] and exceedances[t]:     n01 += 1
+        if exceedances[t-1] and not exceedances[t]:     n10 += 1
+        if exceedances[t-1] and exceedances[t]:         n11 += 1
+    p01 = n01 / (n00 + n01) if (n00 + n01) > 0 else 0
+    p11 = n11 / (n10 + n11) if (n10 + n11) > 0 else 0
+    p = (n01 + n11) / (n00 + n01 + n10 + n11)
+    if p in (0, 1) or p01 in (0, 1) or p11 in (0, 1): return None
+    log_l_null = (n00 + n10) * np.log(1 - p) + (n01 + n11) * np.log(p)
+    log_l_alt = n00 * np.log(1 - p01) + n01 * np.log(p01) + n10 * np.log(1 - p11) + n11 * np.log(p11)
+    lr = -2 * (log_l_null - log_l_alt)
+    return dict(lr=lr, reject=lr > 3.84)</code></pre>
+
+<h3>Exercise D: Rolling drawdown for risk monitoring</h3>
+<p>Maximum drawdown over a rolling window. Useful for risk dashboards: alarm when 6-month rolling drawdown exceeds X%.</p>
+<pre><code>def rolling_max_drawdown(equity, window=126):
+    """126 trading days = 6 months. Returns a Series of rolling max drawdowns."""
+    eq = equity.values
+    out = np.full(len(eq), np.nan)
+    for t in range(window, len(eq)):
+        win = eq[t - window:t + 1]
+        peak = np.maximum.accumulate(win)
+        dd = 1 - win / peak
+        out[t] = dd.max()
+    return pd.Series(out, index=equity.index)</code></pre>
+
+<h3>Exercise E: Risk-adjusted performance attribution</h3>
+<p>Decompose a portfolio return into Sharpe-equivalent contributions per asset.</p>
+<pre><code>def sharpe_attribution(weights, returns_df, rf=0.02 / 252):
+    daily_rets = returns_df @ weights
+    sigma = daily_rets.std(ddof=1) * np.sqrt(252)
+    contributions = {}
+    for col in returns_df.columns:
+        contrib_to_mean = weights[col] * (returns_df[col].mean() - rf) * 252
+        contrib_to_vol = (weights[col] * (returns_df.cov() @ weights)[col]) * 252 / sigma
+        contributions[col] = contrib_to_mean / sigma
+    return pd.Series(contributions)</code></pre>
+
+<h2 id="s8">10. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>An options trader writes deep out-of-the-money puts. The premium is small but losses on a crash can be enormous. Which risk measure is most misleading for this position, and which is most informative? Explain.</p>
+  <p><em>Answer:</em> Variance is misleading because day-to-day variation is small until a crash. VaR can be misleading at common confidence levels because the tail event sits past the VaR boundary, contributing zero. CVaR captures the expected loss conditional on the crash, which is the right number. Drawdown captures the path of the crash. Use CVaR + max drawdown together.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, numerical</h3>
+  <p>For a Gaussian loss with $\mu = 0$ and $\sigma = 1$, compute VaR$_{0.99}$ and CVaR$_{0.99}$ by hand. Use $z_{0.99} = 2.33$ and $\phi(2.33) = 0.0264$. Confirm CVaR / VaR ≈ 1.15.</p>
+  <p><em>Answer:</em> VaR = 2.33. CVaR = $\phi(2.33) / (1 - 0.99)$ = $0.0264 / 0.01$ = $2.64$. Ratio = $2.64 / 2.33$ = $1.13$.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, coding</h3>
+  <p>Extend <code>historical_var_cvar</code> to handle a 2D array of asset losses (rows = days, cols = assets). Return a Series of VaR and CVaR per asset. Then run it on a 60/40 portfolio: VaR(60/40) should be smaller than 0.6 VaR(equity) + 0.4 VaR(bond) most of the time, satisfying CVaR sub-additivity.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_02_portfolio_variance.html">← Lesson 2</a></span>
+  <span>Module A complete. Continue with Module B (Markowitz core) when ready.</span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false}
+      ],
+      throwOnError: false
+    });
+  }
+});
+
+// ----- Math utilities -----
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randn(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function randt(rng, df) {
+  const z = randn(rng);
+  let chi = 0;
+  for (let i = 0; i < df; i++) {
+    const g = randn(rng); chi += g * g;
+  }
+  return z / Math.sqrt(chi / df);
+}
+function quantile(arr, q) {
+  const sorted = arr.slice().sort((a, b) => a - b);
+  const idx = q * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+function mean(a) { let s = 0; for (const x of a) s += x; return s / a.length; }
+function std(a) {
+  const m = mean(a); let s = 0;
+  for (const x of a) s += (x - m) * (x - m);
+  return Math.sqrt(s / (a.length - 1));
+}
+function linspace(a, b, n) {
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = a + (b - a) * i / (n - 1);
+  return out;
+}
+// Inverse normal CDF (Beasley-Springer-Moro)
+function normInv(p) {
+  const a = [-39.6968302866538, 220.946098424521, -275.928510446969,
+             138.357751867269, -30.6647980661472, 2.50662827745924];
+  const b = [-54.4760987982241, 161.585836858041, -155.698979859887,
+             66.8013118877197, -13.2806815528857];
+  const c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184,
+             -2.54973253934373, 4.37466414146497, 2.93816398269878];
+  const d = [0.00778469570904146, 0.32246712907004, 2.445134137143,
+             3.75440866190742];
+  const pLow = 0.02425, pHigh = 1 - pLow;
+  let q, r;
+  if (p < pLow) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+           ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  if (p <= pHigh) {
+    q = p - 0.5; r = q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+  q = Math.sqrt(-2 * Math.log(1 - p));
+  return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+          ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+function normPdf(z) { return Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI); }
+
+// =========== Section 2: VaR slider ===========
+const ASSET_PARAMS = {
+  spy:  { mu: 0.08/252, vol: 0.15/Math.sqrt(252), df: 5 },
+  agg:  { mu: 0.04/252, vol: 0.05/Math.sqrt(252), df: 8 },
+  btc:  { mu: 0.30/252, vol: 0.80/Math.sqrt(252), df: 3 },
+  '6040': { mu: 0.06/252, vol: 0.10/Math.sqrt(252), df: 6 }
+};
+let cachedReturns = null, cachedKey = '';
+function getReturns() {
+  const asset = document.getElementById('asset_pick').value;
+  const n = parseInt(document.getElementById('n').value);
+  const key = `${asset}_${n}`;
+  if (cachedKey === key) return cachedReturns;
+  const p = ASSET_PARAMS[asset];
+  const rng = mulberry32(2026);
+  const r = new Array(n);
+  for (let i = 0; i < n; i++) {
+    r[i] = p.mu + p.vol * randt(rng, p.df);
+  }
+  cachedReturns = r; cachedKey = key;
+  return r;
+}
+function updateS2() {
+  const alpha = parseFloat(document.getElementById('alpha').value);
+  document.getElementById('alpha_v').textContent = alpha.toFixed(3);
+  document.getElementById('n_v').textContent = document.getElementById('n').value;
+
+  const r = getReturns();
+  const losses = r.map(x => -x);
+  const varH = quantile(losses, alpha);
+  const tail = losses.filter(x => x >= varH);
+  const cvarH = tail.length > 0 ? mean(tail) : varH;
+  const m = mean(losses), s = std(losses);
+  const z = normInv(alpha);
+  const varG = m + s * z;
+  const worst = Math.max(...losses);
+
+  document.getElementById('var_hist').textContent = (varH * 100).toFixed(2) + '%';
+  document.getElementById('var_gauss').textContent = (varG * 100).toFixed(2) + '%';
+  document.getElementById('cvar_hist').textContent = (cvarH * 100).toFixed(2) + '%';
+  document.getElementById('worst').textContent = (worst * 100).toFixed(2) + '%';
+
+  Plotly.react('hist_plot', [
+    { x: losses.map(x => x * 100), type: 'histogram', histnorm: 'probability density', name: 'Loss histogram', marker: { color: '#2b6cb0', opacity: 0.6 }, nbinsx: 60 }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Loss (% per day)' },
+    yaxis: { title: 'Density' },
+    shapes: [
+      { type: 'line', x0: varH * 100, x1: varH * 100, yref: 'paper', y0: 0, y1: 1, line: { color: '#dd6b20', width: 2.5, dash: 'dash' } },
+      { type: 'line', x0: cvarH * 100, x1: cvarH * 100, yref: 'paper', y0: 0, y1: 1, line: { color: '#c53030', width: 2.5 } }
+    ],
+    annotations: [
+      { x: varH * 100, y: 1, yref: 'paper', text: `VaR = ${(varH*100).toFixed(2)}%`, showarrow: false, yanchor: 'bottom', font: { color: '#dd6b20' } },
+      { x: cvarH * 100, y: 1, yref: 'paper', text: `CVaR = ${(cvarH*100).toFixed(2)}%`, showarrow: false, yanchor: 'bottom', xshift: 50, font: { color: '#c53030' } }
+    ],
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['asset_pick', 'alpha', 'n'].forEach(id => document.getElementById(id).addEventListener('input', () => { cachedKey = ''; updateS2(); }));
+updateS2();
+
+// =========== Section 3: CVaR/VaR ratio across distributions ===========
+function tQuantile(p, df) {
+  // Approximate via inversion using monte-carlo-free method:
+  // use binary search on CDF approximation
+  // Use approximation: t quantile = z * sqrt(df / (df - 2)) for large df
+  // For accuracy, use simple approximation via numerical inversion
+  // Since this is a teaching tool we use a sample-based approach
+  return null; // unused; we use sampling instead
+}
+function distSample(name, n, rng) {
+  const out = new Array(n);
+  if (name === 'norm') {
+    for (let i = 0; i < n; i++) out[i] = randn(rng);
+  } else {
+    const df = parseInt(name.slice(1));
+    for (let i = 0; i < n; i++) out[i] = randt(rng, df) * Math.sqrt((df - 2) / df);
+  }
+  return out;
+}
+function updateS3() {
+  const dist = document.getElementById('dist_pick').value;
+  const alpha = parseFloat(document.getElementById('alpha2').value);
+  document.getElementById('alpha2_v').textContent = alpha.toFixed(3);
+
+  const rng = mulberry32(31);
+  const sample = distSample(dist, 50000, rng);
+  const losses = sample.map(x => -x);
+  const v = quantile(losses, alpha);
+  const tail = losses.filter(x => x >= v);
+  const cv = mean(tail);
+  document.getElementById('r_var').textContent = v.toFixed(3);
+  document.getElementById('r_cvar').textContent = cv.toFixed(3);
+  document.getElementById('r_ratio').textContent = (cv / v).toFixed(3);
+
+  // Sweep alpha for the curve
+  const alphas = linspace(0.85, 0.999, 50);
+  const ratios = alphas.map(a => {
+    const v_ = quantile(losses, a);
+    const tail_ = losses.filter(x => x >= v_);
+    return tail_.length > 0 ? mean(tail_) / v_ : 1;
+  });
+
+  Plotly.react('ratio_plot', [
+    { x: alphas, y: ratios, type: 'scatter', mode: 'lines', line: { color: '#2b6cb0', width: 2.5 }, name: `${dist} CVaR/VaR` },
+    { x: [alpha], y: [cv / v], type: 'scatter', mode: 'markers', marker: { size: 12, color: '#c53030' }, name: 'Current $\\alpha$' }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Confidence $\\alpha$' },
+    yaxis: { title: 'CVaR / VaR ratio' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['dist_pick', 'alpha2'].forEach(id => document.getElementById(id).addEventListener('input', updateS3));
+updateS3();
+
+// =========== Section 5: Bond default counterexample ===========
+function updateS5() {
+  const p = parseFloat(document.getElementById('p').value);
+  const alpha = parseFloat(document.getElementById('alpha3').value);
+  document.getElementById('p_v').textContent = p.toFixed(3);
+  document.getElementById('alpha3_v').textContent = alpha.toFixed(3);
+
+  // VaR(A) alone: loss is 0 with prob 1-p, 100 with prob p
+  // Quantile alpha of the loss distribution:
+  // If 1 - p > alpha, the alpha-quantile is 0
+  // Else it is 100
+  const varA = (1 - p) >= alpha ? 0 : 100;
+  const varB = varA;
+
+  // VaR(A+B) under independence, weight 0.5 each so each contributes 50:
+  // P(loss = 0) = (1-p)^2
+  // P(loss = 50) = 2 p (1-p)
+  // P(loss = 100) = p^2
+  const p0 = (1 - p) ** 2;
+  const p50 = 2 * p * (1 - p);
+  const p100 = p ** 2;
+  let varAB;
+  if (p0 >= alpha) varAB = 0;
+  else if (p0 + p50 >= alpha) varAB = 50;
+  else varAB = 100;
+
+  // CVaR(A+B): expected loss in tail past VaR
+  // Tail mass = 1 - alpha
+  // For computation, take all losses >= varAB and average
+  // Sum of tail losses divided by tail probability
+  let tailMass = 0, tailSum = 0;
+  if (varAB <= 0) { tailMass += p0; tailSum += 0 * p0; }
+  if (varAB <= 50) { tailMass += p50; tailSum += 50 * p50; }
+  tailMass += p100; tailSum += 100 * p100;
+  const cvarAB = tailMass > 0 ? tailSum / tailMass : varAB;
+
+  document.getElementById('var_a').textContent = varA.toFixed(0);
+  document.getElementById('var_b').textContent = varB.toFixed(0);
+  document.getElementById('var_sum').textContent = (varA + varB).toFixed(0);
+  document.getElementById('var_combined').textContent = varAB.toFixed(0);
+  document.getElementById('cvar_combined').textContent = cvarAB.toFixed(2);
+  const ok = varAB <= varA + varB;
+  document.getElementById('sub_check').textContent = ok ? '✓ yes' : '✗ NO (VaR fails!)';
+  document.getElementById('sub_check').style.color = ok ? '#22543d' : '#c53030';
+}
+['p', 'alpha3'].forEach(id => document.getElementById(id).addEventListener('input', updateS5));
+updateS5();
+
+// =========== Section 6: Drawdown simulation ===========
+function updateS6() {
+  const muA = parseFloat(document.getElementById('dd_mu').value);
+  const volA = parseFloat(document.getElementById('dd_vol').value);
+  const beta = parseFloat(document.getElementById('dd_beta').value);
+  const years = parseInt(document.getElementById('dd_years').value);
+  const seed = parseInt(document.getElementById('dd_seed').value);
+  document.getElementById('dd_mu_v').textContent = muA;
+  document.getElementById('dd_vol_v').textContent = volA;
+  document.getElementById('dd_beta_v').textContent = beta.toFixed(2);
+  document.getElementById('dd_years_v').textContent = years;
+  document.getElementById('dd_seed_v').textContent = seed;
+
+  const n = years * 252;
+  const muD = muA / 100 / 252;
+  const baseVol = volA / 100 / Math.sqrt(252);
+  const rng = mulberry32(seed);
+  const eps = new Array(n);
+  for (let i = 0; i < n; i++) eps[i] = randn(rng);
+  const sig = new Array(n); sig[0] = baseVol;
+  const ret = new Array(n); ret[0] = muD + sig[0] * eps[0];
+  const alphaA = 1 - beta - 0.001;
+  for (let t = 1; t < n; t++) {
+    sig[t] = Math.sqrt(baseVol * baseVol * (1 - beta - alphaA) + alphaA * ret[t-1] * ret[t-1] + beta * sig[t-1] * sig[t-1]);
+    ret[t] = muD + sig[t] * eps[t];
+  }
+  // Equity curve
+  const eq = new Array(n + 1); eq[0] = 1;
+  for (let t = 0; t < n; t++) eq[t + 1] = eq[t] * (1 + ret[t]);
+  // Drawdown
+  const peak = new Array(eq.length); peak[0] = eq[0];
+  for (let t = 1; t < eq.length; t++) peak[t] = Math.max(peak[t-1], eq[t]);
+  const dd = eq.map((v, t) => 1 - v / peak[t]);
+  const mdd = Math.max(...dd);
+  const troughIdx = dd.indexOf(mdd);
+  // Find recovery
+  const peakValAtTrough = peak[troughIdx];
+  let recIdx = -1;
+  for (let t = troughIdx + 1; t < eq.length; t++) {
+    if (eq[t] >= peakValAtTrough) { recIdx = t; break; }
+  }
+  const peakIdx = eq.slice(0, troughIdx + 1).indexOf(peakValAtTrough);
+  const recDays = recIdx > 0 ? recIdx - peakIdx : -1;
+
+  // Realised stats
+  const meanR = mean(ret) * 252 * 100;
+  const stdR = std(ret) * Math.sqrt(252) * 100;
+  const sharpe = stdR > 0 ? meanR / stdR : 0;
+  const calmar = mdd > 0 ? meanR / 100 / mdd : 0;
+
+  document.getElementById('mdd').textContent = (mdd * 100).toFixed(1) + '%';
+  document.getElementById('rec').textContent = recDays > 0 ? recDays + ' days' : 'not yet';
+  document.getElementById('sharpe').textContent = sharpe.toFixed(2);
+  document.getElementById('calmar').textContent = calmar.toFixed(2);
+
+  Plotly.react('dd_plot', [
+    { y: eq, type: 'scatter', mode: 'lines', line: { color: '#2b6cb0', width: 1.8 }, name: 'Equity curve' },
+    { y: dd.map(d => -d * 100), type: 'scatter', mode: 'lines', line: { color: '#c53030', width: 1.5 }, fill: 'tozeroy', name: 'Drawdown (%)', xaxis: 'x2', yaxis: 'y2' },
+    { x: [peakIdx], y: [eq[peakIdx]], type: 'scatter', mode: 'markers', marker: { size: 12, color: '#22543d', symbol: 'triangle-up' }, name: 'Peak' },
+    { x: [troughIdx], y: [eq[troughIdx]], type: 'scatter', mode: 'markers', marker: { size: 12, color: '#c53030', symbol: 'triangle-down' }, name: 'Trough' }
+  ], {
+    grid: { rows: 2, columns: 1, pattern: 'independent' },
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { domain: [0, 1] },
+    yaxis: { title: 'Growth of $1', domain: [0.45, 1] },
+    xaxis2: { title: 'Day', domain: [0, 1], anchor: 'y2' },
+    yaxis2: { title: '% from peak', domain: [0, 0.35] },
+    showlegend: true,
+    legend: { orientation: 'h', y: -0.10 }
+  }, { displayModeBar: false });
+}
+['dd_mu', 'dd_vol', 'dd_beta', 'dd_years', 'dd_seed'].forEach(id => document.getElementById(id).addEventListener('input', updateS6));
+updateS6();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 2: Portfolio Variance from Scratch</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg: #fafbfc; --fg: #1a202c; --muted: #4a5568;
+    --primary: #2b6cb0; --accent: #c05621;
+    --card: #fff; --border: #e2e8f0;
+    --insight: #fffbea; --insight-border: #f59e0b;
+    --code-bg: #1a202c; --code-fg: #e2e8f0;
+    --demo-bg: #f7fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 920px; margin: 0 auto; padding: 2rem;
+    line-height: 1.65; color: var(--fg); background: var(--bg);
+  }
+  h1 { font-size: 2.1rem; color: var(--primary); margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: var(--accent); margin-top: 2rem; }
+  p { margin: 0.8rem 0; }
+  .toc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.5rem; margin: 1.5rem 0;
+  }
+  .toc ol { margin: 0.4rem 0 0 0; padding-left: 1.4rem; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .demo {
+    background: var(--demo-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.5rem 0;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: var(--muted); font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: 'JetBrains Mono', 'Courier New', monospace; color: var(--accent); font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight {
+    background: var(--insight); border-left: 4px solid var(--insight-border);
+    padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0;
+  }
+  .formula {
+    background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0;
+    border-left: 3px solid var(--primary);
+  }
+  code { background: var(--code-bg); color: var(--code-fg); padding: 0.1rem 0.4rem;
+         border-radius: 3px; font-size: 0.88em; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  pre {
+    background: var(--code-bg); color: var(--code-fg); padding: 1rem 1.2rem;
+    border-radius: 6px; overflow-x: auto; font-size: 0.88em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  .selftest {
+    background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px;
+    padding: 1rem 1.5rem; margin: 2rem 0;
+  }
+  .selftest h3 { color: var(--primary); margin-top: 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem;
+          background: white; border-radius: 4px; border: 1px solid var(--border); }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem;
+         border-top: 1px solid var(--border); color: var(--muted); }
+  .nav a { color: var(--primary); text-decoration: none; }
+  .matrix {
+    display: inline-block; border-left: 2px solid var(--fg); border-right: 2px solid var(--fg);
+    padding: 0.3rem 0.8rem; margin: 0 0.3rem; font-family: 'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<h1>Lesson 2: Portfolio Variance from Scratch</h1>
+<p class="subtitle">Module A, Week 1, Lesson 2. Build the affine identity from the first principles of expectations and covariance, then watch a covariance ellipsoid morph as you change correlations.</p>
+
+<div class="toc">
+  <strong>What you will learn</strong>
+  <ol>
+    <li><a href="#s1">A portfolio is a linear combination of returns</a></li>
+    <li><a href="#s2">Expectation is linear: $\mathbb{E}[w'r] = w'\mu$</a></li>
+    <li><a href="#s3">Variance is quadratic: $\text{Var}(w'r) = w'\Sigma w$</a></li>
+    <li><a href="#s4">The covariance ellipsoid (geometry of $\Sigma$)</a></li>
+    <li><a href="#s5">Diversification through correlation</a></li>
+    <li><a href="#s6">The closed form minimum variance portfolio</a></li>
+    <li><a href="#s7">Generalising to N assets</a></li>
+    <li><a href="#s8">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls: what every slider means</h2>
+<p>A short glossary so you know exactly what each parameter is doing in the math.</p>
+
+<h3>$\mu_i$: the asset's mean return (annualised)</h3>
+<p>The first moment of asset $i$'s return distribution. We slide it from $-5\%$ to $+20\%$ annualised. Means are notoriously hard to estimate from data: even with 30 years of monthly observations, the standard error of an estimated mean is comparable to the mean itself for most assets. This estimation difficulty is the central topic of <strong>Lesson 9</strong>. For now, think of $\mu_i$ as a forward-looking number that comes from your view (carry, value, macro) rather than from the historical mean.</p>
+
+<h3>$\sigma_i$: the asset's volatility (annualised)</h3>
+<p>The square root of the second central moment, $\sigma_i = \sqrt{\mathbb{E}[(r_i - \mu_i)^2]}$. Volatility is much easier to estimate than mean. With 1 year of daily data you typically have a good handle on $\sigma_i$. We slide from $5\%$ to $50\%$ annualised. Equity index $\sigma$ sits around $15\%$. Single stock $\sigma$ sits around $25\%$ to $40\%$. Crypto $\sigma$ sits around $60\%$ to $100\%$. Bonds sit around $5\%$ to $10\%$.</p>
+
+<h3>$\rho_{ij}$: the correlation between asset $i$ and asset $j$</h3>
+<p>$\rho_{ij} = \text{Cov}(r_i, r_j) / (\sigma_i \sigma_j)$. By Cauchy-Schwarz, $\rho \in [-1, +1]$. Three regimes matter intuitively:</p>
+<ul>
+  <li>$\rho > 0$: assets move together. Typical equity-equity correlation is 0.4 to 0.8 within a region.</li>
+  <li>$\rho \approx 0$: assets are uncorrelated. Gold-equity often sits here.</li>
+  <li>$\rho < 0$: assets move opposite. Bond-equity in calm markets is negative.</li>
+</ul>
+<p>The slider goes from $-0.95$ to $+0.95$. We avoid $\pm 1$ exactly because the covariance matrix becomes singular and cannot be inverted. Singular $\Sigma$ is a feature you will meet again in Lesson 13.</p>
+
+<h3>Number of assets (2 vs 3)</h3>
+<p>Two assets is the smallest interesting case. Closed forms exist, plots are 2D. Three assets is the smallest case where you can see "true" portfolio behaviour: a budget constraint, a covariance matrix with off-diagonal structure, and the shape of the efficient frontier. Anything beyond three is conceptually identical, just higher-dimensional.</p>
+
+<h3>Simulated draws (n_sims)</h3>
+<p>How many points we draw from the joint distribution to plot the cloud and ellipsoid. More draws make the cloud denser and statistical estimates more reliable, but slow rendering. 1500 to 3000 is a good balance.</p>
+
+<h3>Joint distribution: Gaussian vs Student t</h3>
+<p>The Gaussian is the textbook default. The Student t (with df = 4 here) is the more realistic heavy-tailed alternative. Toggle and compare. The covariance matrix $\Sigma$ remains the same in both cases, but the t will produce more extreme joint moves (clusters of points far from the centre).</p>
+
+<h3>Weights $w_i$</h3>
+<p>The portfolio weights. We allow $w_1 \in [-0.5, 1.5]$, with the remaining mass automatically assigned. Negative weight = short. Above 1 = leverage (you borrow to buy more). The constraint $\sum w_i = 1$ is the budget constraint and is the central piece of the Lagrangian we derive in Section 9 below.</p>
+
+<h2 id="s1">1. A portfolio is a linear combination</h2>
+<p>Suppose you hold weight $w_1$ in asset 1 and $w_2$ in asset 2, with $w_1 + w_2 = 1$. The portfolio return is</p>
+<div class="formula">$$r_p = w_1 r_1 + w_2 r_2 = w^\top r$$</div>
+<p>That is the entire definition. Everything that follows is a consequence of this single linear identity.</p>
+
+<p>For $N$ assets the same formula holds. We use vector notation because it scales: $w$ is the $N$-dimensional weight vector, $r$ is the $N$-dimensional return vector, and $w^\top r$ is the inner product.</p>
+
+<h2 id="s2">2. Expectation is linear</h2>
+<p>The mean of a sum is the sum of the means. This is one of the few identities in probability that holds without any assumptions about independence or distribution.</p>
+
+<div class="formula">$$\mathbb{E}[r_p] = \mathbb{E}[w^\top r] = w^\top \mathbb{E}[r] = w^\top \mu$$</div>
+
+<p>If asset 1 has mean 8% and asset 2 has mean 5%, a 60/40 split has expected return $0.6 \times 8\% + 0.4 \times 5\% = 6.8\%$. No subtleties.</p>
+
+<h2 id="s3">3. Variance is quadratic</h2>
+<p>This is the heart of portfolio theory. The variance of a sum is <em>not</em> the sum of the variances unless the assets are uncorrelated. The general formula uses the full covariance matrix:</p>
+
+<div class="formula">$$\text{Var}(r_p) = \text{Var}(w^\top r) = w^\top \Sigma w$$</div>
+
+<p>To see why, expand for two assets:</p>
+<div class="formula">$$\text{Var}(w_1 r_1 + w_2 r_2) = w_1^2 \sigma_1^2 + w_2^2 \sigma_2^2 + 2 w_1 w_2 \text{Cov}(r_1, r_2)$$</div>
+
+<p>The cross term $2 w_1 w_2 \text{Cov}(r_1, r_2)$ is what makes diversification possible. If $\text{Cov} < 0$, the cross term is negative, and the portfolio variance is <em>less</em> than the weighted average of the individual variances.</p>
+
+<p>You can write the same expression using $\Sigma$, the covariance matrix:</p>
+<div class="formula">$$\Sigma = \begin{bmatrix} \sigma_1^2 & \rho \sigma_1 \sigma_2 \\ \rho \sigma_1 \sigma_2 & \sigma_2^2 \end{bmatrix}$$</div>
+
+<p>The matrix-vector form $w^\top \Sigma w$ generalises to any number of assets without rewriting.</p>
+
+<h3>Live: see $w^\top \Sigma w$ change as you slide weights</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>$\sigma_1$ (asset 1 vol, %): <span class="value" id="s1_v">20</span></label>
+      <input type="range" id="s1" min="5" max="50" step="1" value="20">
+    </div>
+    <div class="control">
+      <label>$\sigma_2$ (asset 2 vol, %): <span class="value" id="s2_v">10</span></label>
+      <input type="range" id="s2" min="5" max="50" step="1" value="10">
+    </div>
+    <div class="control">
+      <label>$\rho$ (correlation): <span class="value" id="rho_v">-0.20</span></label>
+      <input type="range" id="rho" min="-0.95" max="0.95" step="0.05" value="-0.20">
+    </div>
+    <div class="control">
+      <label>$w_1$ (weight asset 1): <span class="value" id="w_v">0.60</span></label>
+      <input type="range" id="w" min="-0.5" max="1.5" step="0.05" value="0.60">
+    </div>
+  </div>
+  <div id="var_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Portfolio variance $w^\top \Sigma w$</span><span class="stat-value" id="port_var">0</span></div>
+    <div class="stat"><span class="stat-label">Portfolio vol</span><span class="stat-value" id="port_vol">0</span></div>
+    <div class="stat"><span class="stat-label">Weighted avg of individual vars</span><span class="stat-value" id="avg_var">0</span></div>
+    <div class="stat"><span class="stat-label">Diversification benefit</span><span class="stat-value" id="div_ben">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>The orange curve below the blue line is diversification.</strong> The blue dot is the current $w_1$. The dashed orange line is the weighted average of individual variances (what you would get if assets were perfectly correlated). The blue parabola is the actual portfolio variance with correlation $\rho$. The gap between them is the diversification benefit.
+</div>
+
+<h2 id="s4">4. The covariance ellipsoid</h2>
+<p>$\Sigma$ has a beautiful geometric interpretation. The level sets of the multivariate normal density</p>
+<div class="formula">$$f(r) \propto \exp\left(-\tfrac{1}{2}(r - \mu)^\top \Sigma^{-1} (r - \mu)\right)$$</div>
+<p>are ellipsoids centred at $\mu$ with shape determined by $\Sigma$. The principal axes of the ellipsoid point along the eigenvectors of $\Sigma$, and the lengths of the axes are the square roots of the eigenvalues. The largest eigenvalue points along the direction of greatest joint variability.</p>
+
+<h3>Live: cloud of returns and the 1-sigma ellipse</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>$\sigma_1$: <span class="value" id="es1_v">20</span></label>
+      <input type="range" id="es1" min="5" max="50" step="1" value="20">
+    </div>
+    <div class="control">
+      <label>$\sigma_2$: <span class="value" id="es2_v">15</span></label>
+      <input type="range" id="es2" min="5" max="50" step="1" value="15">
+    </div>
+    <div class="control">
+      <label>$\rho$: <span class="value" id="erho_v">0.50</span></label>
+      <input type="range" id="erho" min="-0.95" max="0.95" step="0.05" value="0.50">
+    </div>
+  </div>
+  <div id="ellipse_plot" class="plot" style="height: 420px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Eigenvalue 1 (large)</span><span class="stat-value" id="eig1">0</span></div>
+    <div class="stat"><span class="stat-label">Eigenvalue 2 (small)</span><span class="stat-value" id="eig2">0</span></div>
+    <div class="stat"><span class="stat-label">Condition number $\kappa(\Sigma)$</span><span class="stat-value" id="cond">0</span></div>
+    <div class="stat"><span class="stat-label">Determinant $\det(\Sigma)$</span><span class="stat-value" id="detS">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Drag $\rho$ from $-0.95$ to $+0.95$.</strong> The cloud rotates. As $|\rho| \to 1$, the ellipse pancakes into a thin line. That thin line is a <em>collinearity</em>. The smaller eigenvalue heads toward zero. The condition number $\kappa(\Sigma) = \lambda_{\max} / \lambda_{\min}$ blows up. Many later lessons (Lesson 9 on error maximisation, Lesson 13 on covariance estimation) are about taming this.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 89):</strong> The eigenstructure of $\Sigma$ is itself a regime indicator. When the largest eigenvalue dominates, capturing more than 60% of total variance, all assets effectively move together. This is the "risk-off" regime: traditional diversification fails. When the spectrum is flatter (largest eigenvalue under 40%), diversification works as intended. Macrosynergy uses this directly: rolling 6-month $\Sigma$ eigendecomposition feeds the regime classifier of Lesson 27. The condition number you computed in the demo above is the same statistic, expressed differently.
+</div>
+
+<h2 id="s5">5. Diversification through correlation</h2>
+<p>The whole reason portfolio theory exists is the fact that $\rho < 1$ means combining assets reduces total risk below the weighted average of individual risks. This is the only free lunch in finance.</p>
+
+<p>For two assets with equal volatility $\sigma$, an equal weight portfolio has variance</p>
+<div class="formula">$$\text{Var}(0.5 r_1 + 0.5 r_2) = \frac{\sigma^2(1 + \rho)}{2}$$</div>
+
+<p>If $\rho = 1$, this equals $\sigma^2$ (no benefit). If $\rho = 0$, it equals $\sigma^2 / 2$. If $\rho = -1$, it equals $0$. <strong>Perfect anti-correlation eliminates risk completely</strong>, but no two real assets are perfectly anti-correlated.</p>
+
+<h3>Live: the diversification curve</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>$\rho$ (correlation): <span class="value" id="div_rho_v">0.5</span></label>
+      <input type="range" id="div_rho" min="-0.95" max="0.95" step="0.05" value="0.5">
+    </div>
+    <div class="control">
+      <label>$\sigma_1$ = $\sigma_2$ = <span class="value" id="div_s_v">15</span>%</label>
+      <input type="range" id="div_s" min="5" max="40" step="1" value="15">
+    </div>
+  </div>
+  <div id="div_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Equal weight portfolio vol</span><span class="stat-value" id="ew_vol">0</span></div>
+    <div class="stat"><span class="stat-label">Reduction vs single asset</span><span class="stat-value" id="ew_red">0</span></div>
+  </div>
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 3, the flagship):</strong> "Unlocking relative value across asset classes" builds a portfolio over 52 instruments using equal-weighted macro scorecards. No optimisation. Sharpe 1.8, Sortino 2.7 to 2.8, correlation to S&P 500 only 10 to 20%, and the top 5% of months contribute 35 to 40% of cumulative PnL. This is the canonical application of the diversification principle: combine many uncorrelated signals via equal weights, hold tight, never invert anything. Lesson 9 explains the mathematical reason MS refuses to optimise. The dashboard demo above shows it intuitively: $\rho \to 0$ across many pairs gives massive diversification benefit, and equal weights capture most of it without any estimation risk.
+</div>
+
+<h2 id="s6">6. The closed form minimum variance portfolio</h2>
+<p>Now we use calculus. Among all weights with $w_1 + w_2 = 1$, which one minimises portfolio variance? Substitute $w_2 = 1 - w_1$ into the variance formula:</p>
+
+<div class="formula">$$V(w_1) = w_1^2 \sigma_1^2 + (1 - w_1)^2 \sigma_2^2 + 2 w_1 (1 - w_1) \rho \sigma_1 \sigma_2$$</div>
+
+<p>Take the derivative, set it to zero:</p>
+<div class="formula">$$\frac{dV}{dw_1} = 2 w_1 \sigma_1^2 - 2 (1 - w_1) \sigma_2^2 + 2 (1 - 2 w_1) \rho \sigma_1 \sigma_2 = 0$$</div>
+
+<p>Solve for $w_1$:</p>
+<div class="formula">$$w_1^\star = \frac{\sigma_2^2 - \rho \sigma_1 \sigma_2}{\sigma_1^2 + \sigma_2^2 - 2 \rho \sigma_1 \sigma_2}$$</div>
+
+<p>Two important observations. First, this depends only on $\sigma_1$, $\sigma_2$, $\rho$. The means $\mu_1$ and $\mu_2$ do not enter. <strong>Means choose your point on the frontier. Covariance chooses the frontier shape.</strong> Second, when $\sigma_1 = \sigma_2$, the formula simplifies to $w_1^\star = 1/2$ regardless of $\rho$. Equal volatilities yield equal weights at the minimum variance point.</p>
+
+<h3>Live: drag $w_1$ to find the minimum, compare to closed form</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>$\sigma_1$: <span class="value" id="m1_v">25</span></label>
+      <input type="range" id="m1" min="5" max="50" step="1" value="25">
+    </div>
+    <div class="control">
+      <label>$\sigma_2$: <span class="value" id="m2_v">10</span></label>
+      <input type="range" id="m2" min="5" max="50" step="1" value="10">
+    </div>
+    <div class="control">
+      <label>$\rho$: <span class="value" id="mrho_v">0.30</span></label>
+      <input type="range" id="mrho" min="-0.95" max="0.95" step="0.05" value="0.30">
+    </div>
+    <div class="control">
+      <label>Your guess for $w_1$: <span class="value" id="mw_v">0.50</span></label>
+      <input type="range" id="mw" min="-0.5" max="1.5" step="0.01" value="0.50">
+    </div>
+  </div>
+  <div id="min_plot" class="plot" style="height: 340px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Variance at your $w_1$</span><span class="stat-value" id="user_var">0</span></div>
+    <div class="stat"><span class="stat-label">Variance at closed-form $w_1^\star$</span><span class="stat-value" id="opt_var">0</span></div>
+    <div class="stat"><span class="stat-label">Closed-form $w_1^\star$</span><span class="stat-value" id="opt_w">0</span></div>
+    <div class="stat"><span class="stat-label">Reduction from your guess</span><span class="stat-value" id="opt_red">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>The red dashed line is the closed-form optimum.</strong> Try to match it by sliding $w_1$. You will not beat it: it is the global minimum of a strict convex parabola. Now slide $\rho$ to negative values and watch the optimal $w_1^\star$ change. With $\rho < 0$, the optimum moves inside the [0, 1] interval. With $\rho$ very positive, the optimal weight can fall outside [0, 1] (you would short one asset).
+</div>
+
+<h3>The Python translation</h3>
+<pre><code>import numpy as np
+
+def portfolio_var(w, Sigma):
+    return float(w @ Sigma @ w)
+
+def min_var_two_asset(s1, s2, rho):
+    num = s2**2 - rho * s1 * s2
+    den = s1**2 + s2**2 - 2 * rho * s1 * s2
+    return num / den
+
+s1, s2, rho = 0.25, 0.10, 0.30
+w1_star = min_var_two_asset(s1, s2, rho)
+w_star = np.array([w1_star, 1 - w1_star])
+Sigma = np.array([[s1**2, rho*s1*s2], [rho*s1*s2, s2**2]])
+print(f"w1* = {w1_star:.4f}, var = {portfolio_var(w_star, Sigma):.6f}")</code></pre>
+
+<h2 id="s7">7. Generalising to $N$ assets</h2>
+<p>Two-asset closed forms get unwieldy. The $N$-asset minimum variance portfolio has a clean matrix expression. Use a Lagrangian for the budget constraint $\mathbf{1}^\top w = 1$:</p>
+
+<div class="formula">$$\mathcal{L}(w, \lambda) = \tfrac{1}{2} w^\top \Sigma w - \lambda (\mathbf{1}^\top w - 1)$$</div>
+
+<p>Setting $\nabla_w \mathcal{L} = 0$ gives $\Sigma w = \lambda \mathbf{1}$, so $w = \lambda \Sigma^{-1} \mathbf{1}$. The constraint pins down $\lambda$:</p>
+
+<div class="formula">$$w_{\min} = \frac{\Sigma^{-1} \mathbf{1}}{\mathbf{1}^\top \Sigma^{-1} \mathbf{1}}$$</div>
+
+<p>This is the workhorse formula. Notice that <strong>it requires inverting $\Sigma$</strong>. When $\Sigma$ is ill-conditioned (which happens whenever $\rho$ is near $\pm 1$ between any pair of assets, or whenever you have more assets than time periods), $\Sigma^{-1}$ is unstable. That instability is precisely the topic of Lesson 9 (error maximisation) and Lesson 10 (shrinkage).</p>
+
+<div class="insight">
+  <strong>Why this matters going forward.</strong> Every portfolio optimisation problem in this course either uses $\Sigma^{-1}$ directly or sidesteps it (HRP, equal-risk-contribution). When you read a paper, ask: does this method invert $\Sigma$? If yes, what protects it from instability?
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy conceptual parity):</strong> The N-asset min-var formula requires inverting $\Sigma$. With $N$ between 50 and 500, $\Sigma^{-1}$ amplifies estimation error by 3 to 4 orders of magnitude (you will see this in Lesson 9). Macrosynergy refuses to invert $\Sigma$ in production. They equal-weight by economic justification: each macro factor receives an equal risk budget regardless of historical covariance. Articles 23 (macro-aware risk parity) and 88 (macro factors for risk parity) are the closest they come to using $\Sigma$ structure, and even there the weights are pinned by economic priors not least-squares. The whole curriculum from Lesson 7 (risk budgeting) through Lesson 15 (HRP) is about ways to allocate without inverting $\Sigma$.
+</div>
+
+<h2 id="s_math">8. Mathematical companion: derivations and proofs</h2>
+<p>The textbook material that justifies every plot you saw. Read once now, refer back as needed.</p>
+
+<h3>8.1 Why expectation is linear</h3>
+<p>Linearity of expectation says $\mathbb{E}[\sum_i a_i X_i] = \sum_i a_i \mathbb{E}[X_i]$ for any constants $a_i$ and any random variables $X_i$, <strong>regardless of independence</strong>. The proof is one line: integration is linear. For discrete distributions, $\sum_x \sum_i a_i x_i p(x_i) = \sum_i a_i \sum_x x_i p(x_i)$. For continuous, replace sums with integrals. This is the most underrated identity in probability because it does not require independence.</p>
+<p>Applied to portfolios: $\mathbb{E}[w^\top r] = w^\top \mathbb{E}[r] = w^\top \mu$. Asset weights factor cleanly out of the expectation, which is why mean-targeting in mean-variance optimisation is a linear constraint.</p>
+
+<h3>8.2 Why variance is quadratic, in full</h3>
+<p>Variance is the second central moment: $\text{Var}(Y) = \mathbb{E}[(Y - \mathbb{E}[Y])^2]$. For a portfolio:</p>
+<div class="formula">$$\text{Var}(w^\top r) = \mathbb{E}\left[(w^\top r - w^\top \mu)^2\right] = \mathbb{E}\left[(w^\top (r - \mu))^2\right]$$</div>
+<p>The inner term is a scalar, so it equals its own square root squared. Expand:</p>
+<div class="formula">$$(w^\top (r - \mu))^2 = w^\top (r - \mu)(r - \mu)^\top w$$</div>
+<p>Now take expectation. Linearity moves $w^\top$ and $w$ outside:</p>
+<div class="formula">$$\text{Var}(w^\top r) = w^\top \mathbb{E}[(r - \mu)(r - \mu)^\top] w = w^\top \Sigma w$$</div>
+<p>where $\Sigma = \mathbb{E}[(r - \mu)(r - \mu)^\top]$ is the covariance matrix by definition. <strong>This is the affine identity in full.</strong> Every portfolio optimisation in this course descends from this expression.</p>
+
+<h3>8.3 Why $\Sigma$ must be positive semi-definite</h3>
+<p>For any $w \in \mathbb{R}^N$, $w^\top \Sigma w$ is a variance, so it must be non-negative. By definition, that makes $\Sigma$ <strong>positive semi-definite</strong> (PSD). Equivalently, all eigenvalues of $\Sigma$ are non-negative.</p>
+<p>If $\Sigma$ has a zero eigenvalue, there exists a non-zero $w$ with $w^\top \Sigma w = 0$. That portfolio has zero variance: a perfect hedge. This happens when assets are linearly dependent, which is mathematically rare but practically common in factor models.</p>
+<p>If $\Sigma$ has a negative eigenvalue (because of estimation error), the matrix is not a valid covariance and any optimiser using it can return nonsense weights. <strong>Lesson 13</strong> teaches you how to clean $\Sigma$ to keep it PSD.</p>
+
+<h3>8.4 The covariance ellipsoid, derived</h3>
+<p>The multivariate normal density is</p>
+<div class="formula">$$f(r) = \frac{1}{(2\pi)^{N/2} |\Sigma|^{1/2}} \exp\left(-\tfrac{1}{2}(r - \mu)^\top \Sigma^{-1} (r - \mu)\right)$$</div>
+<p>Level sets are sets where $f(r) = c$. Take logs and rearrange: a level set of $f$ is a level set of $(r - \mu)^\top \Sigma^{-1} (r - \mu)$, which is a quadratic form. Quadratic forms with PSD matrices have ellipsoidal level sets centred at $\mu$.</p>
+<p>The principal axes of the ellipsoid point along the eigenvectors of $\Sigma$. The lengths of the semi-axes are proportional to $\sqrt{\lambda_i}$ where $\lambda_i$ are the eigenvalues of $\Sigma$. The largest eigenvalue points along the direction of greatest joint variability.</p>
+<p>The 1-sigma ellipse drawn in the demo above is the level set at $\mu + \sqrt{\lambda_i} v_i$. About 39% of a 2D normal sample falls inside it; the rest is the rim and beyond.</p>
+
+<h3>8.5 The condition number and why it matters</h3>
+<p>$\kappa(\Sigma) = \lambda_{\max}(\Sigma) / \lambda_{\min}(\Sigma)$ measures how stretched the ellipse is. Round ellipse: $\kappa \approx 1$. Pancake: $\kappa \to \infty$. Inversion of $\Sigma$ amplifies any error by roughly $\kappa$. So if $\kappa = 1000$ and your estimated $\Sigma$ has 1% measurement error, the implied $\Sigma^{-1}$ has up to 1000% error.</p>
+<p>This is the formal statement of the "error maximisation" problem with mean-variance optimisation, which we tackle head-on in Lesson 9. Real-world covariance matrices on 50 to 500 assets routinely have $\kappa$ in the thousands, which is why naive Markowitz blows up out of sample.</p>
+
+<h3>8.6 The Lagrangian derivation of the minimum variance portfolio</h3>
+<p>Goal: minimise $\tfrac{1}{2} w^\top \Sigma w$ subject to $\mathbf{1}^\top w = 1$. The Lagrangian is</p>
+<div class="formula">$$\mathcal{L}(w, \lambda) = \tfrac{1}{2} w^\top \Sigma w - \lambda(\mathbf{1}^\top w - 1)$$</div>
+<p>Stationarity in $w$:</p>
+<div class="formula">$$\nabla_w \mathcal{L} = \Sigma w - \lambda \mathbf{1} = 0 \implies w = \lambda \Sigma^{-1} \mathbf{1}$$</div>
+<p>Apply the budget constraint:</p>
+<div class="formula">$$\mathbf{1}^\top w = \lambda \mathbf{1}^\top \Sigma^{-1} \mathbf{1} = 1 \implies \lambda = \frac{1}{\mathbf{1}^\top \Sigma^{-1} \mathbf{1}}$$</div>
+<p>Therefore</p>
+<div class="formula">$$w_{\min} = \frac{\Sigma^{-1} \mathbf{1}}{\mathbf{1}^\top \Sigma^{-1} \mathbf{1}}$$</div>
+<p>The numerator is a vector, the denominator is a scalar. The denominator just normalises the weights to sum to 1.</p>
+
+<h3>8.7 Why $\mu$ does not enter the minimum variance formula</h3>
+<p>This is the geometric heart of the matter. The objective $w^\top \Sigma w$ is a function of $w$ only. The means $\mu$ do not appear in it. The constraint $\mathbf{1}^\top w = 1$ also does not involve $\mu$. So the optimal $w$ cannot depend on $\mu$.</p>
+<p>Geometrically, the level sets of $w^\top \Sigma w$ in weight space are ellipsoids centred at the origin. The constraint $\mathbf{1}^\top w = 1$ is a hyperplane. The minimum variance point is where the smallest ellipsoid touches the hyperplane. This intersection depends on $\Sigma$ and $\mathbf{1}$, not on $\mu$. <strong>Means choose your point on the frontier. Covariance chooses the frontier shape.</strong></p>
+
+<h3>8.8 The two-fund separation theorem (preview of Lesson 5)</h3>
+<p>Tobin (1958) showed: the entire Markowitz efficient frontier can be generated by combining just two distinct portfolios. Any efficient portfolio is a linear combination of the minimum variance portfolio and the tangency portfolio (the one that maximises Sharpe). This is why most investment products bundle into "core" (the tangency or risk-asset bucket) and "cash" (effectively the minimum-variance asset).</p>
+<p>We derive this carefully in Lesson 5 of Module B.</p>
+
+<h3>8.9 Sanity-check: the diversification formula at $\rho = 0$</h3>
+<p>Two assets with $\sigma_1 = \sigma_2 = \sigma$ and equal weights: $\text{Var} = \sigma^2 (1 + \rho) / 2$. At $\rho = 0$, this is $\sigma^2 / 2$. Generalise to $N$ uncorrelated assets with equal weights and equal volatility:</p>
+<div class="formula">$$\text{Var}(\bar{r}) = \text{Var}\left(\tfrac{1}{N}\sum_i r_i\right) = \frac{\sigma^2}{N}$$</div>
+<p>Volatility falls as $\sigma / \sqrt{N}$. This is the diversification rule of $\sqrt{N}$. The catch: real assets are correlated. Adding a 51st correlated equity to a 50-stock portfolio reduces vol by less than $\sqrt{51}/\sqrt{50}$ would predict.</p>
+
+<h2 id="s_code">9. Coding exercises (extras)</h2>
+<p>The companion notebook <code>module_a_exercises.ipynb</code> has 10 fully scaffolded fill-in-the-blank exercises for Lesson 2. Five additional questions for direct practice below.</p>
+
+<h3>Exercise A: Verify the affine identity by Monte Carlo</h3>
+<p>Generate 100,000 samples from a multivariate normal, compute the empirical variance of <code>samples @ w</code>, compare to <code>w @ Sigma @ w</code>. They should match to about 0.5%.</p>
+<pre><code>def verify_affine(w, mu, Sigma, n=100_000, seed=0):
+    rng = np.random.default_rng(seed)
+    samples = rng.multivariate_normal(mu, Sigma, size=n)
+    empirical = samples @ w
+    return dict(empirical_var=empirical.var(ddof=1), theoretical_var=w @ Sigma @ w)</code></pre>
+
+<h3>Exercise B: 2x2 inverse by hand</h3>
+<p>For a 2x2 covariance matrix, write out $\Sigma^{-1}$ using the formula $\Sigma^{-1} = \frac{1}{\det \Sigma} \begin{bmatrix} d & -b \\ -c & a \end{bmatrix}$ for $\Sigma = \begin{bmatrix} a & b \\ c & d \end{bmatrix}$. Verify numerically that $\Sigma \Sigma^{-1} = I$.</p>
+<pre><code>def inverse_2x2(Sigma):
+    a, b = Sigma[0, 0], Sigma[0, 1]
+    c, d = Sigma[1, 0], Sigma[1, 1]
+    det = a * d - b * c
+    return np.array([[d, -b], [-c, a]]) / det</code></pre>
+
+<h3>Exercise C: Maximum diversification portfolio</h3>
+<p>The Choueifaty-Coignard MDP maximises the diversification ratio. Solve numerically.</p>
+<pre><code>from scipy.optimize import minimize
+
+def max_diversification_portfolio(Sigma):
+    n = Sigma.shape[0]
+    sigmas = np.sqrt(np.diag(Sigma))
+    def neg_dr(w):
+        if w.sum() == 0: return 0
+        return -(w @ sigmas) / np.sqrt(w @ Sigma @ w)
+    constraints = [{'type': 'eq', 'fun': lambda w: w.sum() - 1}]
+    bounds = [(0, 1)] * n
+    result = minimize(neg_dr, np.ones(n) / n, constraints=constraints, bounds=bounds, method='SLSQP')
+    return result.x</code></pre>
+
+<h3>Exercise D: ERC by cyclical coordinate descent</h3>
+<p>Equal Risk Contribution: each asset contributes equally to portfolio variance. Solve via coordinate descent.</p>
+<pre><code>def erc_portfolio(Sigma, max_iter=1000, tol=1e-9):
+    n = Sigma.shape[0]
+    w = np.ones(n) / n
+    for _ in range(max_iter):
+        w_old = w.copy()
+        for i in range(n):
+            num = (Sigma @ w)[i] - Sigma[i, i] * w[i]
+            disc = num ** 2 + 4 * Sigma[i, i] * (1 / n) * (w @ Sigma @ w)
+            w[i] = (-num + np.sqrt(disc)) / (2 * Sigma[i, i])
+        w = w / w.sum()
+        if np.linalg.norm(w - w_old) < tol:
+            break
+    return w</code></pre>
+
+<h3>Exercise E: Simulate the Markowitz "error maximisation" effect</h3>
+<p>Take Sigma_true and mu_true. Add Gaussian noise to mu_true with standard deviation 0.005. Solve the tangency portfolio. Repeat 200 times. Plot the distribution of weights. Compare to the same exercise on min-var (which is more stable).</p>
+<pre><code>def error_maximisation(mu, Sigma, sigma_noise=0.005, n_trials=200, seed=0):
+    rng = np.random.default_rng(seed)
+    weights = []
+    for _ in range(n_trials):
+        mu_pert = mu + sigma_noise * rng.standard_normal(len(mu))
+        excess = mu_pert - 0.02
+        w = np.linalg.solve(Sigma, excess)
+        w = w / w.sum()
+        weights.append(w)
+    return np.array(weights)</code></pre>
+
+<h2 id="s8">10. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does $w^\star_{\min}$ for two assets depend only on volatilities and correlation, not on means? Hint: write out $\frac{dV}{dw_1}$. The means are constants when you take the variance.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, geometric</h3>
+  <p>You hold a portfolio with $w = [0.5, 0.5]$, $\sigma_1 = \sigma_2 = 20\%$, $\rho = 0$. The portfolio vol is $\sqrt{0.5^2 \cdot 0.04 + 0.5^2 \cdot 0.04} = \sqrt{0.02} \approx 14.1\%$. Now $\rho$ drops to $-1$. What is the new portfolio vol?</p>
+  <p><em>Answer:</em> 0%. With perfect anti-correlation, equal weight on equal-vol assets eliminates all variance. Verify in the demo above by setting both vols equal and $\rho = -0.95$.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, coding</h3>
+  <p>Implement the $N$-asset minimum variance formula. Test it on a 3-asset case with $\sigma = [0.20, 0.15, 0.10]$ and pairwise correlations all 0.3. The optimal weights should sum to 1 and the portfolio vol should be smaller than any individual asset vol.</p>
+  <pre><code>def min_var_n_asset(Sigma):
+    inv = np.linalg.inv(Sigma)
+    ones = np.ones(Sigma.shape[0])
+    w = inv @ ones
+    return w / w.sum()</code></pre>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_01_returns_stylised_facts.html">← Lesson 1</a></span>
+  <span><a href="lesson_03_risk_measures.html">Next: Lesson 3, Risk Measures →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false}
+      ],
+      throwOnError: false
+    });
+  }
+});
+
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randn(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function linspace(a, b, n) {
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = a + (b - a) * i / (n - 1);
+  return out;
+}
+
+// =========== Section 3: variance vs w_1 ===========
+function portVarTwo(w1, s1, s2, rho) {
+  const w2 = 1 - w1;
+  return w1*w1*s1*s1 + w2*w2*s2*s2 + 2*w1*w2*rho*s1*s2;
+}
+function updateS3() {
+  const s1 = parseFloat(document.getElementById('s1').value) / 100;
+  const s2 = parseFloat(document.getElementById('s2').value) / 100;
+  const rho = parseFloat(document.getElementById('rho').value);
+  const w = parseFloat(document.getElementById('w').value);
+  document.getElementById('s1_v').textContent = (s1*100).toFixed(0);
+  document.getElementById('s2_v').textContent = (s2*100).toFixed(0);
+  document.getElementById('rho_v').textContent = rho.toFixed(2);
+  document.getElementById('w_v').textContent = w.toFixed(2);
+
+  const grid = linspace(-0.5, 1.5, 200);
+  const varCurve = grid.map(x => portVarTwo(x, s1, s2, rho));
+  // weighted average of individual variances (rho = 1 line)
+  const avgCurve = grid.map(x => x*x*s1*s1 + (1-x)*(1-x)*s2*s2 + 2*x*(1-x)*1*s1*s2);
+
+  const pv = portVarTwo(w, s1, s2, rho);
+  const avg = w*w*s1*s1 + (1-w)*(1-w)*s2*s2 + 2*w*(1-w)*1*s1*s2;
+  document.getElementById('port_var').textContent = pv.toFixed(6);
+  document.getElementById('port_vol').textContent = (Math.sqrt(Math.max(0, pv))*100).toFixed(2) + '%';
+  document.getElementById('avg_var').textContent = avg.toFixed(6);
+  document.getElementById('div_ben').textContent = ((avg - pv) > 0 ? ((avg - pv)*1e4).toFixed(2) + ' bp' : '0 bp');
+
+  Plotly.react('var_plot', [
+    { x: grid, y: avgCurve, type: 'scatter', mode: 'lines', name: 'Avg of variances ($\\rho=1$)', line: { color: '#c05621', dash: 'dash', width: 2 } },
+    { x: grid, y: varCurve, type: 'scatter', mode: 'lines', name: `Portfolio variance ($\\rho=${rho.toFixed(2)})`, line: { color: '#2b6cb0', width: 2.5 } },
+    { x: [w], y: [pv], type: 'scatter', mode: 'markers', name: 'Current $w_1$', marker: { size: 12, color: '#2b6cb0', line: { color: 'white', width: 2 } } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Weight on asset 1' },
+    yaxis: { title: 'Portfolio variance' },
+    legend: { orientation: 'h', y: -0.20 }
+  }, { displayModeBar: false });
+}
+['s1','s2','rho','w'].forEach(id => document.getElementById(id).addEventListener('input', updateS3));
+updateS3();
+
+// =========== Section 4: Covariance ellipse ===========
+function eigSymmetric2x2(a, b, c, d) {
+  // Sigma = [[a,b],[c,d]] symmetric (b == c)
+  const T = a + d, D = a*d - b*c;
+  const disc = Math.sqrt(Math.max(0, T*T/4 - D));
+  const l1 = T/2 + disc;
+  const l2 = T/2 - disc;
+  // eigenvector for l1
+  let v1, v2;
+  if (Math.abs(b) > 1e-12) {
+    v1 = [b, l1 - a]; v2 = [b, l2 - a];
+  } else {
+    v1 = [1, 0]; v2 = [0, 1];
+  }
+  const norm1 = Math.sqrt(v1[0]*v1[0] + v1[1]*v1[1]);
+  const norm2 = Math.sqrt(v2[0]*v2[0] + v2[1]*v2[1]);
+  return { l1, l2, v1: [v1[0]/norm1, v1[1]/norm1], v2: [v2[0]/norm2, v2[1]/norm2] };
+}
+
+function updateS4() {
+  const s1 = parseFloat(document.getElementById('es1').value) / 100;
+  const s2 = parseFloat(document.getElementById('es2').value) / 100;
+  const rho = parseFloat(document.getElementById('erho').value);
+  document.getElementById('es1_v').textContent = (s1*100).toFixed(0);
+  document.getElementById('es2_v').textContent = (s2*100).toFixed(0);
+  document.getElementById('erho_v').textContent = rho.toFixed(2);
+
+  const a = s1*s1, b = rho*s1*s2, d = s2*s2;
+  const eig = eigSymmetric2x2(a, b, b, d);
+  document.getElementById('eig1').textContent = eig.l1.toFixed(6);
+  document.getElementById('eig2').textContent = eig.l2.toFixed(6);
+  document.getElementById('cond').textContent = (eig.l1 / Math.max(eig.l2, 1e-10)).toFixed(2);
+  document.getElementById('detS').textContent = (a*d - b*b).toFixed(8);
+
+  // Generate sample
+  const rng = mulberry32(11);
+  const xs = [], ys = [];
+  // Cholesky for [[a,b],[b,d]]: L = [[sqrt(a), 0], [b/sqrt(a), sqrt(d - b*b/a)]]
+  const La = Math.sqrt(a);
+  const Lba = b / Math.max(La, 1e-10);
+  const Lc = Math.sqrt(Math.max(d - Lba*Lba, 0));
+  for (let i = 0; i < 1500; i++) {
+    const z1 = randn(rng), z2 = randn(rng);
+    xs.push(La * z1);
+    ys.push(Lba * z1 + Lc * z2);
+  }
+
+  // 1-sigma ellipse
+  const N = 100;
+  const ex = new Array(N), ey = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const t = 2 * Math.PI * i / (N - 1);
+    const u = Math.sqrt(eig.l1) * Math.cos(t);
+    const v = Math.sqrt(eig.l2) * Math.sin(t);
+    ex[i] = eig.v1[0]*u + eig.v2[0]*v;
+    ey[i] = eig.v1[1]*u + eig.v2[1]*v;
+  }
+  // Eigenvector arrows
+  const ax = [0, eig.v1[0] * Math.sqrt(eig.l1)];
+  const ay = [0, eig.v1[1] * Math.sqrt(eig.l1)];
+  const bx = [0, eig.v2[0] * Math.sqrt(eig.l2)];
+  const by = [0, eig.v2[1] * Math.sqrt(eig.l2)];
+
+  Plotly.react('ellipse_plot', [
+    { x: xs, y: ys, type: 'scatter', mode: 'markers', name: 'Sample returns', marker: { size: 3, opacity: 0.4, color: '#2b6cb0' } },
+    { x: ex, y: ey, type: 'scatter', mode: 'lines', name: '1$\\sigma$ ellipse', line: { color: '#c53030', width: 2.5 } },
+    { x: ax, y: ay, type: 'scatter', mode: 'lines+markers', name: 'Principal axis 1', line: { color: '#22543d', width: 3 }, marker: { size: 8 } },
+    { x: bx, y: by, type: 'scatter', mode: 'lines+markers', name: 'Principal axis 2', line: { color: '#744210', width: 3 }, marker: { size: 8 } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Return on asset 1', scaleanchor: 'y', scaleratio: 1 },
+    yaxis: { title: 'Return on asset 2' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['es1','es2','erho'].forEach(id => document.getElementById(id).addEventListener('input', updateS4));
+updateS4();
+
+// =========== Section 5: Diversification curve ===========
+function updateS5() {
+  const rho = parseFloat(document.getElementById('div_rho').value);
+  const sig = parseFloat(document.getElementById('div_s').value) / 100;
+  document.getElementById('div_rho_v').textContent = rho.toFixed(2);
+  document.getElementById('div_s_v').textContent = (sig*100).toFixed(0);
+
+  const rhoGrid = linspace(-0.99, 1.0, 200);
+  const ewVar = rhoGrid.map(r => sig*sig*(1+r)/2);
+  const ewVol = ewVar.map(v => Math.sqrt(Math.max(v, 0))*100);
+
+  const cur = sig * Math.sqrt((1+rho)/2);
+  document.getElementById('ew_vol').textContent = (cur*100).toFixed(2) + '%';
+  document.getElementById('ew_red').textContent = ((1 - cur/sig)*100).toFixed(1) + '%';
+
+  Plotly.react('div_plot', [
+    { x: rhoGrid, y: ewVol, type: 'scatter', mode: 'lines', line: { color: '#2b6cb0', width: 2.5 }, name: '50/50 portfolio vol' },
+    { x: [rho], y: [cur*100], type: 'scatter', mode: 'markers', marker: { size: 12, color: '#c53030' }, name: 'Current $\\rho$' },
+    { x: rhoGrid, y: rhoGrid.map(_ => sig*100), type: 'scatter', mode: 'lines', line: { color: '#c05621', dash: 'dash', width: 1.5 }, name: 'Single asset vol' }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Correlation $\\rho$' },
+    yaxis: { title: '50/50 portfolio vol (%)' },
+    legend: { orientation: 'h', y: -0.20 }
+  }, { displayModeBar: false });
+}
+['div_rho','div_s'].forEach(id => document.getElementById(id).addEventListener('input', updateS5));
+updateS5();
+
+// =========== Section 6: Closed form min var ===========
+function updateS6() {
+  const s1 = parseFloat(document.getElementById('m1').value) / 100;
+  const s2 = parseFloat(document.getElementById('m2').value) / 100;
+  const rho = parseFloat(document.getElementById('mrho').value);
+  const w = parseFloat(document.getElementById('mw').value);
+  document.getElementById('m1_v').textContent = (s1*100).toFixed(0);
+  document.getElementById('m2_v').textContent = (s2*100).toFixed(0);
+  document.getElementById('mrho_v').textContent = rho.toFixed(2);
+  document.getElementById('mw_v').textContent = w.toFixed(2);
+
+  const num = s2*s2 - rho*s1*s2;
+  const den = s1*s1 + s2*s2 - 2*rho*s1*s2;
+  const wOpt = num / den;
+
+  const grid = linspace(-0.5, 1.5, 200);
+  const curve = grid.map(x => portVarTwo(x, s1, s2, rho));
+  const userVar = portVarTwo(w, s1, s2, rho);
+  const optVar = portVarTwo(wOpt, s1, s2, rho);
+
+  document.getElementById('user_var').textContent = userVar.toFixed(6);
+  document.getElementById('opt_var').textContent = optVar.toFixed(6);
+  document.getElementById('opt_w').textContent = wOpt.toFixed(4);
+  document.getElementById('opt_red').textContent = userVar > 0 ? ((userVar - optVar) / userVar * 100).toFixed(2) + '%' : '0%';
+
+  Plotly.react('min_plot', [
+    { x: grid, y: curve, type: 'scatter', mode: 'lines', line: { color: '#2b6cb0', width: 2 }, name: 'Variance' },
+    { x: [w], y: [userVar], type: 'scatter', mode: 'markers', marker: { size: 12, color: '#c05621' }, name: 'Your guess' },
+    { x: [wOpt], y: [optVar], type: 'scatter', mode: 'markers', marker: { size: 14, color: '#c53030', symbol: 'star' }, name: 'Closed-form $w_1^\\star$' }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Weight on asset 1' },
+    yaxis: { title: 'Portfolio variance' },
+    shapes: [{ type: 'line', x0: wOpt, x1: wOpt, y0: 0, y1: Math.max(...curve), yref: 'y', line: { color: '#c53030', dash: 'dash', width: 1.5 } }],
+    legend: { orientation: 'h', y: -0.20 }
+  }, { displayModeBar: false });
+}
+['m1','m2','mrho','mw'].forEach(id => document.getElementById(id).addEventListener('input', updateS6));
+updateS6();
+</script>
+
+</body>
+</html>

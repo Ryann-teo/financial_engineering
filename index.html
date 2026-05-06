@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Construction Curriculum</title>
+<meta name="description" content="A 30-lesson interactive curriculum on portfolio construction, from probability foundations to a multi-asset systematic capstone.">
+<style>
+:root {
+  --bg: #fafbfc;
+  --fg: #1a202c;
+  --muted: #4a5568;
+  --primary: #2b6cb0;
+  --primary-dark: #1e4d80;
+  --accent: #c05621;
+  --border: #e2e8f0;
+  --card-bg: #ffffff;
+  --live: #38a169;
+  --pending: #cbd5e0;
+  --tan: #f6e7d7;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.6;
+}
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+/* Hero */
+header.hero {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  padding: 5rem 2rem 6rem;
+  text-align: center;
+  position: relative;
+}
+header.hero h1 { font-size: 3rem; margin-bottom: 0.5rem; font-weight: 800; letter-spacing: -0.02em; }
+header.hero .tagline { font-size: 1.2rem; opacity: 0.92; max-width: 720px; margin: 0 auto; }
+header.hero .meta { margin-top: 1.5rem; font-size: 0.9rem; opacity: 0.85; }
+header.hero .meta a { color: #cbd5e0; }
+
+/* Progress card sticking up over the hero */
+.progress-section {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  margin: -3rem auto 3rem;
+  max-width: 900px;
+  position: relative;
+  z-index: 2;
+}
+.progress-section h2 { font-size: 1.2rem; margin-bottom: 0.75rem; color: var(--fg); }
+.progress-bar {
+  background: var(--border);
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+.progress-bar > div { background: linear-gradient(90deg, var(--primary), var(--accent)); height: 100%; transition: width 0.4s; }
+.progress-section .stats { display: flex; gap: 2rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); }
+.progress-section .stats .stat { display: flex; align-items: baseline; gap: 0.4rem; }
+.progress-section .stats .num { font-weight: 700; color: var(--primary); font-size: 1.05rem; }
+
+/* About */
+.about { margin: 3rem 0; max-width: 850px; }
+.about h2 { color: var(--primary); font-size: 1.8rem; margin-bottom: 1rem; }
+.about p { color: var(--muted); margin: 0.7rem 0; }
+
+/* Module section */
+.module { margin: 4rem 0; }
+.module-header { display: flex; align-items: baseline; gap: 1.2rem; margin-bottom: 0.5rem; }
+.module-letter {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+.module-title { font-size: 1.6rem; color: var(--fg); }
+.module-desc { color: var(--muted); margin-bottom: 1.5rem; max-width: 850px; }
+
+/* Cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.4rem;
+  text-decoration: none;
+  color: var(--fg);
+  transition: all 0.18s ease;
+  display: block;
+  position: relative;
+}
+.card:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); border-color: var(--primary); text-decoration: none; }
+.card.pending { opacity: 0.7; cursor: default; }
+.card.pending:hover { transform: none; box-shadow: none; border-color: var(--border); }
+.lesson-num { font-size: 0.75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; }
+.lesson-title { font-size: 1.1rem; font-weight: 600; margin: 0.4rem 0 0.6rem; color: var(--fg); line-height: 1.3; }
+.lesson-desc { font-size: 0.88rem; color: var(--muted); line-height: 1.5; }
+.badge {
+  position: absolute; top: 1rem; right: 1rem;
+  font-size: 0.65rem; padding: 0.25rem 0.65rem;
+  border-radius: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.badge.live { background: #f0fff4; color: var(--live); border: 1px solid #c6f6d5; }
+.badge.pending { background: #f7fafc; color: var(--muted); border: 1px solid var(--border); }
+
+/* Reading materials */
+.docs { margin: 3rem 0 5rem; }
+.docs h2 { color: var(--primary); font-size: 1.8rem; margin-bottom: 1rem; }
+
+footer {
+  background: #1a202c;
+  color: #cbd5e0;
+  padding: 3rem 2rem;
+  margin-top: 4rem;
+}
+footer .container { padding: 0; }
+footer h3 { color: white; margin-bottom: 0.5rem; font-size: 1.1rem; }
+footer p { margin: 0.5rem 0; font-size: 0.9rem; }
+footer a { color: #93c5fd; }
+
+@media (max-width: 700px) {
+  header.hero h1 { font-size: 2.1rem; }
+  header.hero { padding: 3rem 1rem 5rem; }
+  .container { padding: 1rem; }
+  .module-header { flex-direction: column; gap: 0.5rem; }
+  .module-letter { font-size: 2.5rem; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Portfolio Construction</h1>
+  <p class="tagline">A 30-lesson interactive curriculum building from probability foundations to a multi-asset systematic capstone, with live demos and code exercises for every concept.</p>
+  <p class="meta">By Ryan Teo &middot; <a href="https://github.com/Ryann-teo/financial_engineering">GitHub</a></p>
+</header>
+
+<div class="container">
+
+  <section class="progress-section">
+    <h2>Curriculum progress: 7 of 30 lessons live</h2>
+    <div class="progress-bar"><div style="width: 23%;"></div></div>
+    <div class="stats">
+      <div class="stat"><span class="num">7</span><span>built</span></div>
+      <div class="stat"><span class="num">23</span><span>in queue</span></div>
+      <div class="stat"><span class="num">2</span><span>complete modules (A and B)</span></div>
+      <div class="stat"><span class="num">5</span><span>upcoming modules (C through G)</span></div>
+    </div>
+  </section>
+
+  <section class="about">
+    <h2>About this curriculum</h2>
+    <p>
+      An eight-week journey that takes a learner from "what is a return?" through advanced portfolio
+      optimisation: Markowitz, risk parity, Black-Litterman, CVaR, hierarchical risk parity, vol targeting,
+      factor models, and a cross-asset macro capstone.
+    </p>
+    <p>
+      Every lesson is a self-contained interactive HTML page with KaTeX math, Plotly demos, embedded
+      code exercises, and "in practice" boxes connecting the abstract math to a real Macrosynergy
+      strategy where applicable.
+    </p>
+    <p>
+      No installation required to read the lessons. Open any HTML file in your browser. For the coding
+      exercises, see <a href="module_a_exercises.ipynb">module_a_exercises.ipynb</a>.
+    </p>
+  </section>
+
+  <!-- Module A -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">A</span>
+      <h2 class="module-title">Foundations of Risk and Return</h2>
+    </div>
+    <p class="module-desc">
+      The language of returns, multivariate distributions, and risk measures. Build the affine identity
+      $w^\top \Sigma w$ from first principles before any optimiser appears.
+    </p>
+    <div class="cards">
+      <a href="lesson_01_returns_stylised_facts.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 01</span>
+        <h3 class="lesson-title">Returns and stylised facts</h3>
+        <p class="lesson-desc">Simple vs log returns, the five empirical facts of asset returns, heavy tails and the role of the Student t.</p>
+      </a>
+      <a href="lesson_02_portfolio_variance.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 02</span>
+        <h3 class="lesson-title">Portfolio variance from scratch</h3>
+        <p class="lesson-desc">The affine identity, covariance ellipsoid geometry, diversification through correlation, closed-form min-var.</p>
+      </a>
+      <a href="lesson_03_risk_measures.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 03</span>
+        <h3 class="lesson-title">Risk measures: variance to drawdown</h3>
+        <p class="lesson-desc">VaR, CVaR, drawdown, the four coherence axioms, and why CVaR is preferred for portfolio optimisation.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- Module B -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">B</span>
+      <h2 class="module-title">Classical Mean-Variance Theory</h2>
+    </div>
+    <p class="module-desc">
+      Markowitz, KKT, risk budgeting, and the statistics of the Sharpe ratio. The canonical machinery
+      and where it goes wrong.
+    </p>
+    <div class="cards">
+      <a href="lesson_05_markowitz.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 05</span>
+        <h3 class="lesson-title">The Markowitz problem</h3>
+        <p class="lesson-desc">Four equivalent formulations, closed-form solutions, the efficient frontier, tangency, capital market line, two-fund theorem.</p>
+      </a>
+      <a href="lesson_06_kkt_constraints.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 06</span>
+        <h3 class="lesson-title">KKT and constraints</h3>
+        <p class="lesson-desc">Convex programming, Lagrangians, KKT conditions, dual values, the cost of long-only and sector caps.</p>
+      </a>
+      <a href="lesson_07_risk_budgeting.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 07</span>
+        <h3 class="lesson-title">Risk budgeting</h3>
+        <p class="lesson-desc">Euler decomposition, marginal/incremental/component contributions, diversification ratio, gateway to risk parity.</p>
+      </a>
+      <a href="lesson_08_sharpe_statistics.html" class="card">
+        <span class="badge live">Live</span>
+        <span class="lesson-num">Lesson 08</span>
+        <h3 class="lesson-title">Sharpe statistics</h3>
+        <p class="lesson-desc">Sampling distribution of estimated Sharpe, Probabilistic Sharpe, Deflated Sharpe, why "best of grid search" fails.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- Module C -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">C</span>
+      <h2 class="module-title">Estimation Error and Robust Optimisation</h2>
+    </div>
+    <p class="module-desc">
+      Markowitz is mathematically beautiful and empirically explosive. Why, and what to do about it.
+    </p>
+    <div class="cards">
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 09</span>
+        <h3 class="lesson-title">Why mean-variance fails</h3>
+        <p class="lesson-desc">Error maximisation, the T &lt; N regime, why 1/N often beats Markowitz out of sample.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 10</span>
+        <h3 class="lesson-title">Shrinkage and Bayesian</h3>
+        <p class="lesson-desc">James-Stein, Ledoit-Wolf, normal-inverse-Wishart posteriors, the workhorse of regression-based ML.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 11</span>
+        <h3 class="lesson-title">Black-Litterman</h3>
+        <p class="lesson-desc">Reverse-optimised market-implied returns, encoding views, posterior calculation.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 12</span>
+        <h3 class="lesson-title">Robust optimisation</h3>
+        <p class="lesson-desc">Uncertainty sets, ellipsoidal SOCP, distributionally-robust optimisation, resampled efficiency.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 13</span>
+        <h3 class="lesson-title">Covariance estimation</h3>
+        <p class="lesson-desc">Six estimators side-by-side, RMT eigenvalue cleaning, factor-model covariance, hierarchical block.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module D -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">D</span>
+      <h2 class="module-title">Risk Parity Family</h2>
+    </div>
+    <p class="module-desc">
+      The non-Markowitz allocation paradigm. ERC, HRP, and CVaR optimisation.
+    </p>
+    <div class="cards">
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 14</span>
+        <h3 class="lesson-title">Equal risk contribution</h3>
+        <p class="lesson-desc">ERC by cyclical coordinate descent, the convex Spinu reformulation, macro-aware risk parity.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 15</span>
+        <h3 class="lesson-title">Hierarchical risk parity</h3>
+        <p class="lesson-desc">Lopez de Prado's HRP: distance from correlation, dendrogram, quasi-diagonalisation, recursive bisection.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 16</span>
+        <h3 class="lesson-title">CVaR and drawdown optimisation</h3>
+        <p class="lesson-desc">Rockafellar-Uryasev LP, conditional drawdown at risk, MinMax drawdown control.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module E -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">E</span>
+      <h2 class="module-title">Production Layer</h2>
+    </div>
+    <p class="module-desc">
+      Transaction costs, vol targeting, Kelly. The chassis on top of the engine.
+    </p>
+    <div class="cards">
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 20</span>
+        <h3 class="lesson-title">Cost-aware rebalancing</h3>
+        <p class="lesson-desc">Linear and square-root impact costs, no-trade region, optimal rebalancing frequency.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 21</span>
+        <h3 class="lesson-title">Volatility targeting</h3>
+        <p class="lesson-desc">EWMA vol, target sigma, vol drag, interaction with momentum strategies.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 22</span>
+        <h3 class="lesson-title">Kelly criterion</h3>
+        <p class="lesson-desc">Log-utility, multi-asset Kelly, fractional Kelly, why no one runs full Kelly.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module F -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">F</span>
+      <h2 class="module-title">Factors and Signals</h2>
+    </div>
+    <p class="module-desc">
+      Factor risk decomposition, mandate constraints, and signal blending. Where the Macrosynergy
+      strategies live.
+    </p>
+    <div class="cards">
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 24</span>
+        <h3 class="lesson-title">Factor models</h3>
+        <p class="lesson-desc">BARRA-style risk and alpha decomposition, statistical vs fundamental factors.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 25</span>
+        <h3 class="lesson-title">Mandate constraints, TE</h3>
+        <p class="lesson-desc">Tracking error budgets, beta neutrality, sector caps, ESG tilts.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 26</span>
+        <h3 class="lesson-title">Signal blending</h3>
+        <p class="lesson-desc">Equal-weight, IC-weighted, orthogonalisation, Grinold's law of active management.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module G -->
+  <section class="module">
+    <div class="module-header">
+      <span class="module-letter">G</span>
+      <h2 class="module-title">Validation, Regime, Capstone</h2>
+    </div>
+    <p class="module-desc">
+      Honest backtesting, regime-aware allocation, and the cross-asset macro capstone.
+    </p>
+    <div class="cards">
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 23</span>
+        <h3 class="lesson-title">Backtesting and CPCV</h3>
+        <p class="lesson-desc">Walk-forward, purged k-fold, combinatorial purged CV, the deflated Sharpe in production.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 27</span>
+        <h3 class="lesson-title">Regime-aware allocation</h3>
+        <p class="lesson-desc">HMM regime classification, regime-conditional moments, the smooth tilting layer.</p>
+      </div>
+      <div class="card pending">
+        <span class="badge pending">Coming soon</span>
+        <span class="lesson-num">Lesson 29</span>
+        <h3 class="lesson-title">Cross-asset macro capstone</h3>
+        <p class="lesson-desc">The full pipeline: signals, blending, optimisation, vol target, drawdown, costs, backtest, attribution.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reading materials -->
+  <section class="docs">
+    <h2>Reading materials</h2>
+    <div class="cards">
+      <a href="https://github.com/Ryann-teo/financial_engineering/blob/main/README.md" class="card">
+        <span class="lesson-num">Doc</span>
+        <h3 class="lesson-title">README</h3>
+        <p class="lesson-desc">How to read and run the lessons.</p>
+      </a>
+      <a href="https://github.com/Ryann-teo/financial_engineering/blob/main/dashboard_building_guide.md" class="card">
+        <span class="lesson-num">Doc</span>
+        <h3 class="lesson-title">Dashboard building guide</h3>
+        <p class="lesson-desc">How the dashboards are built. CSS, KaTeX, Plotly, PRNG patterns.</p>
+      </a>
+      <a href="https://github.com/Ryann-teo/financial_engineering/blob/main/lessons_09_to_30_outline.md" class="card">
+        <span class="lesson-num">Doc</span>
+        <h3 class="lesson-title">Build queue for Lessons 9 to 30</h3>
+        <p class="lesson-desc">Detailed spec for each remaining lesson.</p>
+      </a>
+      <a href="module_a_exercises.ipynb" class="card">
+        <span class="lesson-num">Notebook</span>
+        <h3 class="lesson-title">Module A exercises</h3>
+        <p class="lesson-desc">33 Jupyter exercises with synthetic data and asserts.</p>
+      </a>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="container">
+    <h3>Portfolio Construction Curriculum</h3>
+    <p>An interactive, in-progress curriculum on portfolio construction. Built by Ryan Teo.</p>
+    <p>Source: <a href="https://github.com/Ryann-teo/financial_engineering">github.com/Ryann-teo/financial_engineering</a></p>
+    <p style="margin-top: 1rem; font-size: 0.85rem; opacity: 0.7;">Built with vanilla HTML, KaTeX, and Plotly. No build step.</p>
+  </div>
+</footer>
+
+</body>
+</html>

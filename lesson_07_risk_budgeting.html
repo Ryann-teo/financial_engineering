@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 7: Risk Budgeting</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', sans-serif; max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: #1a202c; background: #fafbfc; }
+  h1 { font-size: 2.1rem; color: #2b6cb0; margin-bottom: 0.2rem; }
+  .subtitle { color: #4a5568; font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: #2b6cb0; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: #c05621; margin-top: 2rem; }
+  .toc { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .demo { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.2rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: #4a5568; font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: monospace; color: #c05621; font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid #2b6cb0; }
+  pre { background: #1a202c; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; }
+  pre code { background: none; padding: 0; }
+  code { background: #1a202c; color: #e2e8f0; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+  .stat-value { font-family: monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; color: #4a5568; }
+  .nav a { color: #2b6cb0; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 7: Risk Budgeting and the Euler Decomposition</h1>
+<p class="subtitle">Module D, Week 4, Lesson 7. Allocate by deciding how much risk each asset should contribute, then solve for weights. Gateway to risk parity (Lesson 14).</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Risk decomposition by asset</a></li>
+    <li><a href="#s2">Marginal, incremental, component contributions</a></li>
+    <li><a href="#s3">The diversification ratio</a></li>
+    <li><a href="#s4">The risk budgeting problem</a></li>
+    <li><a href="#s5">Equal risk contribution and risk parity</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+
+<h3>Risk budgets $b_i$</h3>
+<p>The vector of target risk shares. $b_i$ is the fraction of total portfolio risk that asset $i$ should carry. Constraints: $b_i \ge 0$ and $\sum_i b_i = 1$. Equal risk contribution means $b_i = 1/N$.</p>
+
+<h3>Asset volatilities $\sigma_i$</h3>
+<p>Same as previous lessons. Annualised. The risk-budgeting algorithm uses individual vols and correlations.</p>
+
+<h3>Correlation block</h3>
+<p>Toggle between low-correlation (most cross-correlations near 0) and high-correlation (cross-correlations 0.6 to 0.8). Watch how the risk budget allocation responds.</p>
+
+<h2 id="s1">1. Risk decomposition by asset</h2>
+
+<p>The portfolio variance is $w^\top \Sigma w$. By Euler's theorem applied to homogeneous-of-degree-2 functions:</p>
+<div class="formula">$$w^\top \Sigma w = \sum_{i=1}^{N} w_i \cdot (\Sigma w)_i$$</div>
+<p>Each term $w_i (\Sigma w)_i$ is the <strong>risk contribution</strong> of asset $i$. They sum to total variance, exactly. Divide by portfolio standard deviation $\sigma_p = \sqrt{w^\top \Sigma w}$:</p>
+<div class="formula">$$\sigma_p = \sum_{i=1}^N \text{RC}_i, \quad \text{RC}_i = \frac{w_i (\Sigma w)_i}{\sigma_p}$$</div>
+<p>The $\text{RC}_i$ sum to portfolio vol. They are dollar-units of risk per asset, with no double counting and no leftovers. This is the cleanest way to attribute risk.</p>
+
+<h2 id="s2">2. Marginal, incremental, component</h2>
+
+<p>Three related quantities, often confused.</p>
+<p><strong>Marginal contribution</strong> $\text{MC}_i = \partial \sigma_p / \partial w_i = (\Sigma w)_i / \sigma_p$. The change in portfolio vol per unit increase in $w_i$. Linear, additive in the sense $\sigma_p = \sum_i w_i \text{MC}_i$.</p>
+<p><strong>Component contribution</strong> $\text{CC}_i = w_i \text{MC}_i$. Same as $\text{RC}_i$. Each asset's "share" of portfolio vol.</p>
+<p><strong>Incremental contribution</strong> $\text{IC}_i = \sigma_p(w) - \sigma_p(w \text{ without asset } i)$. The change in portfolio vol from removing asset $i$ entirely. Generally not equal to $\text{CC}_i$ unless $\Sigma$ is diagonal.</p>
+
+<h2 id="s3">3. The diversification ratio</h2>
+
+<p>Choueifaty and Coignard (2008) define</p>
+<div class="formula">$$\text{DR}(w) = \frac{w^\top \sigma}{\sqrt{w^\top \Sigma w}} = \frac{\text{weighted average vol}}{\text{portfolio vol}}$$</div>
+<p>where $\sigma$ is the vector of individual volatilities. Always $\ge 1$. Single-asset portfolios have DR $= 1$. Equal-weight on uncorrelated assets approaches DR $= \sqrt{N}$. The "Maximum Diversification Portfolio" (MDP) maximises DR over the feasible set.</p>
+
+<h2 id="s4">4. The risk budgeting problem</h2>
+
+<p>Given a target budget vector $b$ with $\sum b_i = 1$, find $w$ such that $\text{RC}_i / \sigma_p = b_i$ for all $i$. Equivalently:</p>
+<div class="formula">$$w_i (\Sigma w)_i = b_i (w^\top \Sigma w) \quad \forall i$$</div>
+
+<p>This is a system of $N$ nonlinear equations. Maillard, Roncalli, Teiletche (2010) show it has a unique solution under positivity ($w_i > 0$). Spinu (2013) gives a convex reformulation:</p>
+<div class="formula">$$\min_{w > 0} \tfrac{1}{2} w^\top \Sigma w - \sum_i b_i \log w_i$$</div>
+<p>Standard convex solvers handle this. For ERC ($b_i = 1/N$), the solution is the Equal Risk Contribution portfolio.</p>
+
+<h3>Live: drag risk budgets, watch weights and risk shares</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Asset 1 budget: <span class="value" id="b1_v">25%</span></label>
+      <input type="range" id="b1" min="5" max="60" step="1" value="25">
+    </div>
+    <div class="control">
+      <label>Asset 2 budget: <span class="value" id="b2_v">25%</span></label>
+      <input type="range" id="b2" min="5" max="60" step="1" value="25">
+    </div>
+    <div class="control">
+      <label>Asset 3 budget: <span class="value" id="b3_v">25%</span></label>
+      <input type="range" id="b3" min="5" max="60" step="1" value="25">
+    </div>
+    <div class="control">
+      <label>Correlation regime: <span class="value" id="reg_v">low</span></label>
+      <input type="range" id="regime" min="0" max="1" step="1" value="0">
+    </div>
+  </div>
+  <div id="rb_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Portfolio vol</span><span class="stat-value" id="pvol">0</span></div>
+    <div class="stat"><span>Diversification ratio</span><span class="stat-value" id="div_r">0</span></div>
+    <div class="stat"><span>Effective N (ENB)</span><span class="stat-value" id="enb">0</span></div>
+    <div class="stat"><span>Largest weight</span><span class="stat-value" id="max_w">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Try this:</strong> set all four budgets equal (25% each) under the low-correlation regime. The weights will look reasonable. Switch to high correlation and watch the weights diverge from the budget shares: the same risk allocation requires very different weights when assets are tied together.
+</div>
+
+<h2 id="s5">5. Equal risk contribution and risk parity</h2>
+
+<p>ERC is the special case $b_i = 1/N$. Each asset contributes exactly $1/N$ of total portfolio variance. Properties:</p>
+<ul>
+  <li>No $\mu$ required. Robust to estimation error in expected returns.</li>
+  <li>Always sits between equal-weight and minimum variance.</li>
+  <li>Out-of-sample, often beats both Markowitz and equal-weight (DeMiguel et al., 2009 finding extends here).</li>
+  <li>Sharpe is naturally lower than the tangency portfolio (no return prediction). ERC needs leverage to match equity Sharpe.</li>
+</ul>
+
+<p>Risk parity is the asset-allocation strategy built on ERC: scale up the bond exposure with leverage so its risk contribution matches equity. Pioneered by Bridgewater All Weather (1996) and AQR Risk Parity (2006). Lesson 14 covers the implementation in detail.</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 23, 88):</strong> Macro-aware risk parity. Take ERC weights as the baseline and tilt them with a macro signal (e.g. growth, inflation regime) to capture cyclical opportunities. Article 23 demonstrates this on cross-asset data with Sharpe 1.3 (vs 0.8 for plain risk parity). Article 88 generalises with a multi-factor macro overlay. The key insight: ERC gives you a stable risk-balanced portfolio; the macro tilt adds the alpha. This is a deliberate "two-fund" structure where one fund is the risk-balanced book and the other is the macro overlay.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 Why Euler's theorem applies</h3>
+<p>$f(w) = w^\top \Sigma w$ is homogeneous of degree 2: $f(c w) = c^2 f(w)$. By Euler's theorem, $\sum_i w_i (\partial f / \partial w_i) = 2 f(w)$. The factor of 2 disappears when we work with $\sigma_p = \sqrt{f(w)}$, which is homogeneous of degree 1. The risk-contribution decomposition is exact: no remainder, no approximation.</p>
+
+<h3>6.2 The Spinu convex reformulation</h3>
+<p>The risk-budgeting problem $w_i (\Sigma w)_i = b_i (w^\top \Sigma w)$ has the same first-order conditions as $\min_{w > 0} \tfrac{1}{2} w^\top \Sigma w - \sum_i b_i \log w_i$. The log barrier creates a unique interior solution. Coordinate descent converges quickly: at each step, fix all but one $w_i$ and solve a 1D quadratic.</p>
+
+<h3>6.3 Effective number of bets (Meucci)</h3>
+<p>Meucci (2009) proposes the entropy of the risk-contribution share vector:</p>
+<div class="formula">$$\text{ENB} = \exp\left(- \sum_i \frac{\text{RC}_i}{\sigma_p} \log \frac{\text{RC}_i}{\sigma_p}\right)$$</div>
+<p>ENB ranges from 1 (single-asset concentration) to $N$ (perfect ERC). It is invariant to correlation structure when applied to the principal-component projection.</p>
+
+<h3>6.4 Risk parity vs minimum variance: when do they coincide?</h3>
+<p>If all assets have equal volatility and equal pairwise correlations, ERC and min-var both produce equal weights. They diverge when $\Sigma$ has heterogeneous diagonals. ERC weights inversely with vol (so low-vol assets get big weights) but adjusts for correlations (so heavily-correlated low-vol assets get less weight than naive inverse-vol).</p>
+
+<h3>6.5 The "leverage problem" of risk parity</h3>
+<p>To match a 60/40 portfolio's expected return at the same vol, ERC typically needs 1.5x to 2x leverage. The leverage cost (financing rate above the risk-free rate) eats into the Sharpe gain. Asness, Frazzini, Pedersen (2012) find that risk parity beats 60/40 even after realistic leverage costs, but the margin shrinks. The 2022 inflation shock hurt risk parity disproportionately because both bonds and equities sold off, breaking the "hedge" assumption.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+
+<h3>Exercise A: Risk contribution decomposition</h3>
+<pre><code>def risk_contributions(w, Sigma):
+    sigma_p = np.sqrt(w @ Sigma @ w)
+    mc = (Sigma @ w) / sigma_p
+    rc = w * mc
+    return {'sigma_p': sigma_p, 'mc': mc, 'rc': rc, 'share': rc / sigma_p}</code></pre>
+
+<h3>Exercise B: ERC by cyclical coordinate descent</h3>
+<pre><code>def erc_ccd(Sigma, max_iter=1000, tol=1e-9):
+    n = Sigma.shape[0]
+    w = np.ones(n) / n
+    for _ in range(max_iter):
+        w_old = w.copy()
+        for i in range(n):
+            # Solve w_i (Sigma w)_i = (1/n) (w' Sigma w) for w_i
+            # Quadratic in w_i with all other w_j fixed
+            other = np.delete(Sigma[i, :], i) @ np.delete(w, i)
+            a = Sigma[i, i]
+            # Equation: w_i * (a*w_i + other) = (1/n) * portfolio_var(w)
+            # Solve numerically each step
+            ...
+        if np.linalg.norm(w - w_old) &lt; tol: break
+    return w / w.sum()</code></pre>
+
+<h3>Exercise C: Risk budgeting via convex optimisation</h3>
+<pre><code>import cvxpy as cp
+
+def risk_budget_portfolio(Sigma, b):
+    n = Sigma.shape[0]
+    w = cp.Variable(n, pos=True)
+    obj = cp.Minimize(0.5 * cp.quad_form(w, Sigma) - b @ cp.log(w))
+    prob = cp.Problem(obj)
+    prob.solve()
+    return w.value / w.value.sum()</code></pre>
+
+<h3>Exercise D: Decomposed PnL attribution</h3>
+<p>Apply the risk-contribution formula to a realised PnL stream. For a vol-targeted ERC portfolio, compute the time series of each asset's contribution to realised vol. Plot stacked area chart.</p>
+
+<h3>Exercise E: Compare ERC, min-var, and equal-weight</h3>
+<p>On a 10-asset DM equity universe, compute all three portfolios. Backtest 2010 to 2025. Report annualised Sharpe, max drawdown, turnover. Expected: ERC sits between equal-weight and min-var in vol; sharpe slightly above equal-weight; turnover much lower than min-var.</p>
+
+<h2 id="s_test">8. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>For a 60/40 portfolio (60% S&amp;P 500 at 18% vol, 40% AGG at 6% vol, $\rho = 0$), compute each asset's risk contribution share. Why is the share so far from 60/40?</p>
+  <p><em>Answer:</em> equity vol $\times$ 0.6 = 10.8; bond vol $\times$ 0.4 = 2.4. Total $\approx \sqrt{10.8^2 + 2.4^2} \approx 11.06$. Share: equity 97%, bond 3%. The "60/40" portfolio is actually 97/3 in risk space.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify Exercise C to add a constraint that the largest weight cannot exceed 30%. Hint: <code>w &lt;= 0.30</code>.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>For three assets with equal vols and equal correlations $\rho = 0.3$, compute the ERC weights. Verify the result is exactly $1/3$ in each.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_06_kkt_constraints.html">← Lesson 6</a></span>
+  <span><a href="lesson_08_sharpe_statistics.html">Next: Lesson 8, Sharpe statistics →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+      throwOnError: false
+    });
+  }
+});
+
+const N = 4;
+const sigma_v = [0.20, 0.10, 0.18, 0.15];
+const asset_names = ['Equity', 'Bond', 'Gold', 'EM'];
+function buildSigma(regime) {
+  const baseRho = regime === 0 ? [
+    [1.0, -0.2, 0.1, 0.6],
+    [-0.2, 1.0, 0.0, -0.1],
+    [0.1, 0.0, 1.0, 0.2],
+    [0.6, -0.1, 0.2, 1.0],
+  ] : [
+    [1.0, 0.6, 0.5, 0.8],
+    [0.6, 1.0, 0.4, 0.6],
+    [0.5, 0.4, 1.0, 0.5],
+    [0.8, 0.6, 0.5, 1.0],
+  ];
+  const S = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(sigma_v[i] * sigma_v[j] * baseRho[i][j]);
+    S.push(r);
+  }
+  return S;
+}
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function matVec(A, v) { return A.map(r => r.reduce((s, a, i) => s + a * v[i], 0)); }
+
+// Risk budgeting via fixed-point iteration on the Spinu objective
+// Solve w via gradient: dL/dw_i = (Sigma w)_i - b_i / w_i = 0
+// This gives w_i = sqrt(b_i / (Sigma w)_i * w_i), iterate.
+function riskBudgetPortfolio(Sigma, b) {
+  let w = b.map(bi => Math.sqrt(bi));
+  for (let it = 0; it < 5000; it++) {
+    const Sw = matVec(Sigma, w);
+    let change = 0;
+    for (let i = 0; i < N; i++) {
+      const target = b[i] / Sw[i];
+      const new_wi = Math.sqrt(target);
+      change = Math.max(change, Math.abs(w[i] - new_wi));
+      w[i] = 0.5 * w[i] + 0.5 * new_wi;
+    }
+    if (change < 1e-9) break;
+  }
+  // Normalise to sum 1
+  const s = w.reduce((a, b) => a + b, 0);
+  return w.map(wi => wi / s);
+}
+
+function update7() {
+  const b1 = parseFloat(document.getElementById('b1').value) / 100;
+  const b2 = parseFloat(document.getElementById('b2').value) / 100;
+  const b3 = parseFloat(document.getElementById('b3').value) / 100;
+  let b4 = 1 - b1 - b2 - b3;
+  if (b4 < 0.01) b4 = 0.01;
+  const reg = parseInt(document.getElementById('regime').value);
+  document.getElementById('b1_v').textContent = (b1 * 100).toFixed(0) + '%';
+  document.getElementById('b2_v').textContent = (b2 * 100).toFixed(0) + '%';
+  document.getElementById('b3_v').textContent = (b3 * 100).toFixed(0) + '%';
+  document.getElementById('reg_v').textContent = reg === 0 ? 'low' : 'high';
+
+  const b = [b1, b2, b3, b4];
+  // Renormalise b
+  const bs = b.reduce((a, c) => a + c, 0);
+  const bn = b.map(x => x / bs);
+
+  const Sigma = buildSigma(reg);
+  const w = riskBudgetPortfolio(Sigma, bn);
+  const sigma_p = Math.sqrt(dot(w, matVec(Sigma, w)));
+  const Sw = matVec(Sigma, w);
+  const rc_share = w.map((wi, i) => wi * Sw[i] / (sigma_p * sigma_p));
+  const div_ratio = dot(w, sigma_v) / sigma_p;
+  // ENB
+  let H = 0;
+  for (const s of rc_share) if (s > 1e-9) H -= s * Math.log(s);
+  const enb = Math.exp(H);
+
+  document.getElementById('pvol').textContent = (sigma_p * 100).toFixed(2) + '%';
+  document.getElementById('div_r').textContent = div_ratio.toFixed(2);
+  document.getElementById('enb').textContent = enb.toFixed(2);
+  document.getElementById('max_w').textContent = (Math.max(...w) * 100).toFixed(1) + '%';
+
+  Plotly.react('rb_plot', [
+    { x: asset_names, y: w.map(x => x * 100), type: 'bar', name: 'Weights (%)', marker: { color: '#2b6cb0' } },
+    { x: asset_names, y: rc_share.map(x => x * 100), type: 'bar', name: 'Risk shares (%)', marker: { color: '#c05621' } },
+    { x: asset_names, y: bn.map(x => x * 100), type: 'bar', name: 'Target budget (%)', marker: { color: '#22543d' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Percent' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['b1', 'b2', 'b3', 'regime'].forEach(id => document.getElementById(id).addEventListener('input', update7));
+update7();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 5: The Markowitz Problem</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg: #fafbfc; --fg: #1a202c; --muted: #4a5568;
+    --primary: #2b6cb0; --accent: #c05621;
+    --card: #fff; --border: #e2e8f0;
+    --insight: #fffbea; --insight-border: #f59e0b;
+    --code-bg: #1a202c; --code-fg: #e2e8f0;
+    --demo-bg: #f7fafc;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 920px; margin: 0 auto; padding: 2rem; line-height: 1.65; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 2.1rem; color: var(--primary); margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: var(--accent); margin-top: 2rem; }
+  p { margin: 0.8rem 0; }
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; }
+  .toc ol { margin: 0.4rem 0 0 0; padding-left: 1.4rem; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .demo { background: var(--demo-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.5rem 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: var(--muted); font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .value { font-family: 'JetBrains Mono', 'Courier New', monospace; color: var(--accent); font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight { background: var(--insight); border-left: 4px solid var(--insight-border); padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+  .formula { background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0; border-left: 3px solid var(--primary); }
+  code { background: var(--code-bg); color: var(--code-fg); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.88em; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 1rem 1.2rem; border-radius: 6px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .selftest { background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px; padding: 1rem 1.5rem; margin: 2rem 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem; background: white; border-radius: 4px; border: 1px solid var(--border); }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); }
+  .nav a { color: var(--primary); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 5: The Markowitz Problem</h1>
+<p class="subtitle">Module B, Week 2, Lesson 5. The canonical mean-variance optimisation problem, in all four equivalent forms.</p>
+
+<div class="toc">
+  <strong>What you will learn</strong>
+  <ol>
+    <li><a href="#s0">Reading the controls</a></li>
+    <li><a href="#s1">Four ways to write the same problem</a></li>
+    <li><a href="#s2">The closed-form solutions</a></li>
+    <li><a href="#s3">The efficient frontier</a></li>
+    <li><a href="#s4">Tangency portfolio and the capital market line</a></li>
+    <li><a href="#s5">The two-fund separation theorem</a></li>
+    <li><a href="#s_math">Mathematical companion</a></li>
+    <li><a href="#s_code">Coding exercises</a></li>
+    <li><a href="#s_test">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls</h2>
+
+<h3>Risk aversion $\lambda$</h3>
+<p>The dial that picks your point on the efficient frontier. The Markowitz objective is $w^\top \mu - (\lambda / 2) w^\top \Sigma w$. As $\lambda \to 0$ the optimum chases the highest mean (highest risk). As $\lambda \to \infty$ the optimum collapses to the minimum variance portfolio. Typical values for institutional investors sit between 1 and 10. Hedge funds run lower (0.5 to 2). Pension funds run higher (5 to 20).</p>
+
+<h3>Risk-free rate $r_f$</h3>
+<p>The return on cash. Used to construct the tangency portfolio (which maximises Sharpe). Typical values: 0% in the post-2009 era, 4 to 5% in 2024 to 2026, 0 to 6% as a long-run range.</p>
+
+<h3>Asset means and volatilities</h3>
+<p>Same as Lesson 2. Five-asset universe with sliders for individual $\mu_i$ and $\sigma_i$. Correlations are fixed at a realistic structure (equity-equity 0.5, bond-equity -0.2, gold-everything 0.0 to 0.1).</p>
+
+<h2 id="s1">1. Four ways to write the same problem</h2>
+
+<p>Markowitz (1952) opened the modern theory by writing one problem. Subsequent decades wrote it three more times, each version equivalent to the others under the right Lagrangian.</p>
+
+<p><strong>Form A: max utility.</strong> $\max_w w^\top \mu - (\lambda/2) w^\top \Sigma w$ subject to $\mathbf{1}^\top w = 1$. The objective is mean-variance utility (quadratic utility, equivalently). $\lambda$ is a free parameter that picks where on the frontier you sit.</p>
+
+<p><strong>Form B: max return at fixed risk.</strong> $\max_w w^\top \mu$ subject to $w^\top \Sigma w \le \sigma^2_{\text{target}}$ and $\mathbf{1}^\top w = 1$. Fix risk, push return.</p>
+
+<p><strong>Form C: min risk at fixed return.</strong> $\min_w w^\top \Sigma w$ subject to $w^\top \mu \ge \mu_{\text{target}}$ and $\mathbf{1}^\top w = 1$. Fix return, push risk down.</p>
+
+<p><strong>Form D: max Sharpe.</strong> $\max_w (w^\top \mu - r_f) / \sqrt{w^\top \Sigma w}$ subject to $\mathbf{1}^\top w = 1$. The tangency portfolio. Maximises return per unit of volatility.</p>
+
+<p>All four forms trace the same efficient frontier. They differ only in how they parameterise the trade-off. Form A is computationally easiest because the Lagrangian has a linear gradient. Forms B and C have quadratic constraints. Form D has a non-convex objective until you reformulate it (one of the rare cases in this course where reformulation matters).</p>
+
+<h2 id="s2">2. The closed-form solutions</h2>
+
+<p>Without inequality constraints, Form A has a clean closed form. Take the Lagrangian:</p>
+<div class="formula">$$\mathcal{L}(w, \kappa) = w^\top \mu - (\lambda/2) w^\top \Sigma w - \kappa (\mathbf{1}^\top w - 1)$$</div>
+
+<p>Set $\nabla_w \mathcal{L} = 0$:</p>
+<div class="formula">$$\mu - \lambda \Sigma w - \kappa \mathbf{1} = 0 \implies w = \frac{1}{\lambda} \Sigma^{-1} (\mu - \kappa \mathbf{1})$$</div>
+
+<p>Apply the budget constraint to solve for $\kappa$. The result, with two scalar quantities $A = \mathbf{1}^\top \Sigma^{-1} \mathbf{1}$ and $B = \mathbf{1}^\top \Sigma^{-1} \mu$:</p>
+<div class="formula">$$w_\lambda = \frac{1}{A} \Sigma^{-1} \mathbf{1} + \frac{1}{\lambda}\left(\Sigma^{-1} \mu - \frac{B}{A} \Sigma^{-1} \mathbf{1}\right)$$</div>
+
+<p>Reads: <strong>the optimal portfolio is the minimum variance portfolio plus a "speculative" tilt scaled by $1/\lambda$.</strong> When $\lambda \to \infty$, the tilt vanishes and you sit at min-var. When $\lambda \to 0$, the tilt explodes (which is why we need risk aversion to make the problem well-posed).</p>
+
+<p>The minimum variance portfolio is $w_{\min} = \Sigma^{-1} \mathbf{1} / A$ (Lesson 2). The tangency portfolio is</p>
+<div class="formula">$$w_T = \frac{\Sigma^{-1}(\mu - r_f \mathbf{1})}{\mathbf{1}^\top \Sigma^{-1}(\mu - r_f \mathbf{1})}$$</div>
+
+<p>Both are linear functions of $\Sigma^{-1}$ applied to a vector.</p>
+
+<h2 id="s3">3. The efficient frontier</h2>
+
+<p>Sweep $\lambda$ from $0$ to $\infty$. Plot $(\sigma_p, \mu_p)$ for each $w_\lambda$. The locus is a hyperbola in mean-variance space, called the <strong>efficient frontier</strong>. The lower branch (below min-var) is dominated and not "efficient" in the Pareto sense.</p>
+
+<h3>Live: the frontier explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Risk aversion $\lambda$: <span class="value" id="lam_v">5.00</span></label>
+      <input type="range" id="lam" min="0.1" max="20" step="0.1" value="5">
+    </div>
+    <div class="control">
+      <label>Mean shift on asset 1 (bp/y): <span class="value" id="shift_v">0</span></label>
+      <input type="range" id="shift" min="-300" max="300" step="10" value="0">
+    </div>
+    <div class="control">
+      <label>Risk-free rate $r_f$: <span class="value" id="rf_v">2.0%</span></label>
+      <input type="range" id="rf" min="0" max="6" step="0.1" value="2.0">
+    </div>
+  </div>
+  <div id="frontier_plot" class="plot" style="height: 440px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Optimal portfolio mean</span><span class="stat-value" id="opt_mean">0</span></div>
+    <div class="stat"><span class="stat-label">Optimal portfolio vol</span><span class="stat-value" id="opt_vol">0</span></div>
+    <div class="stat"><span class="stat-label">Optimal Sharpe</span><span class="stat-value" id="opt_sr">0</span></div>
+    <div class="stat"><span class="stat-label">Tangency Sharpe</span><span class="stat-value" id="tan_sr">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Slide $\lambda$ from 0.1 to 20.</strong> Watch the red dot slide along the frontier from the high-mean / high-vol end toward min-var. Now perturb the mean of asset 1. Watch how a small change in $\mu_1$ swings the optimal weights. This sensitivity is the central pathology that Lesson 9 will diagnose and Lessons 10 to 13 will fix.
+</div>
+
+<h2 id="s4">4. Tangency portfolio and the capital market line</h2>
+
+<p>Add a risk-free asset. Now we have one more "asset" with $\mu = r_f$ and $\sigma = 0$. Any portfolio is a mix of cash and the tangency portfolio. The locus of all such mixes is a straight line in $(\sigma, \mu)$ space, called the <strong>Capital Market Line</strong>:</p>
+<div class="formula">$$\mu_p = r_f + \frac{\mu_T - r_f}{\sigma_T} \sigma_p$$</div>
+
+<p>The slope is the tangency Sharpe. The CML lies tangent to the efficient frontier at $w_T$. Any point on the CML strictly dominates any point on the (risky-only) efficient frontier in mean-variance space.</p>
+
+<p>The economic conclusion: <strong>every investor holds the same risky portfolio (the tangency)</strong>, scaled up or down by their preference for risk. This is the celebrated <strong>two-fund separation</strong>.</p>
+
+<h2 id="s5">5. The two-fund separation theorem</h2>
+
+<p>Two distinct efficient portfolios are enough to span the entire frontier. Tobin (1958) proved this. Concretely, every efficient portfolio is a linear combination of $w_{\min}$ and $w_T$:</p>
+<div class="formula">$$w_\lambda = (1 - \alpha_\lambda) w_{\min} + \alpha_\lambda w_T$$</div>
+<p>for some scalar $\alpha_\lambda$ depending on $\lambda$. The investment universe collapses to two funds. This is why most asset managers structure products as "core" (the tangency or risk-asset bucket) and "cash" (or short-duration bonds, the closest practical thing to the risk-free asset).</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy):</strong> MS does not implement Markowitz directly because of the estimation error problem (Lessons 9 to 13). They get the spirit of two-fund separation differently: every strategy is a vol-targeted bet, and the portfolio is a scaled mix of the strategy plus cash. The "tangency" role is played by the diversified strategy book (e.g. the cross-asset relative value trade in art 3), not by an optimised tangency portfolio. The economic logic of two-fund separation survives the death of $\Sigma^{-1}$.
+</div>
+
+<h2 id="s_math">6. Mathematical companion</h2>
+
+<h3>6.1 Why the frontier is a hyperbola</h3>
+<p>The minimum variance for a given target return $\mu_p$ is the value of the constrained optimisation</p>
+<div class="formula">$$\sigma_p^2(\mu_p) = \min_w w^\top \Sigma w \text{ s.t. } \mathbf{1}^\top w = 1, w^\top \mu = \mu_p$$</div>
+<p>The Lagrangian gives a closed form. Let $A = \mathbf{1}^\top \Sigma^{-1} \mathbf{1}$, $B = \mathbf{1}^\top \Sigma^{-1} \mu$, $C = \mu^\top \Sigma^{-1} \mu$. Then</p>
+<div class="formula">$$\sigma_p^2(\mu_p) = \frac{A \mu_p^2 - 2 B \mu_p + C}{AC - B^2}$$</div>
+<p>This is a quadratic in $\mu_p$ in the denominator-free numerator, which means the relation between $\sigma_p$ and $\mu_p$ is a hyperbola in $(\sigma, \mu)$ space (with vertex at the minimum variance portfolio).</p>
+
+<h3>6.2 The Sharpe of the tangency portfolio</h3>
+<p>The maximised Sharpe ratio is</p>
+<div class="formula">$$\text{SR}_T = \sqrt{(\mu - r_f \mathbf{1})^\top \Sigma^{-1} (\mu - r_f \mathbf{1})}$$</div>
+<p>This is the upper bound on Sharpe for any portfolio in this universe. No combination of these assets achieves a higher Sharpe than the tangency portfolio.</p>
+
+<h3>6.3 Why the tangency is the same for everyone (under MV)</h3>
+<p>The tangency formula is independent of $\lambda$. Two investors with different risk aversions both buy $w_T$ in proportion to their risk appetite. They differ only in how much they leverage or de-leverage that single position. This is the mathematical core of the CAPM (Sharpe 1964): if everyone holds the tangency, the tangency must be the market portfolio in equilibrium.</p>
+
+<h3>6.4 Quadratic utility and its discontents</h3>
+<p>Mean-variance utility $u(W) = \mathbb{E}[W] - (\lambda/2) \text{Var}(W)$ corresponds to quadratic utility $u(W) = W - (a/2) W^2$ for an appropriate $a$. Quadratic utility has a fatal flaw: it is non-monotone. For large $W$, marginal utility becomes negative (you would prefer less wealth). Empirically and theoretically, quadratic utility is wrong. But mean-variance optimisation can still be justified under elliptical return distributions (where higher moments are functions of mean and variance), regardless of utility form. Most of the time we use Markowitz as a reasonable approximation, not a derived consequence of quadratic utility.</p>
+
+<h3>6.5 Connection to ordinary least squares</h3>
+<p>The tangency formula $w_T \propto \Sigma^{-1}(\mu - r_f \mathbf{1})$ has the same shape as the OLS coefficient $\hat\beta = (X^\top X)^{-1} X^\top y$. This is not an accident: in the mean-variance regression of returns on a portfolio's return, the optimal "weights" are exactly the regression coefficients of one set of returns on another. Mean-variance optimisation and linear regression share a common geometry.</p>
+
+<h2 id="s_code">7. Coding exercises (extras)</h2>
+
+<h3>Exercise A: Implement Markowitz with cvxpy</h3>
+<pre><code>import cvxpy as cp
+import numpy as np
+
+def markowitz(mu, Sigma, lam):
+    n = len(mu)
+    w = cp.Variable(n)
+    obj = cp.Maximize(mu @ w - 0.5 * lam * cp.quad_form(w, Sigma))
+    cp.Problem(obj, [cp.sum(w) == 1]).solve()
+    return w.value</code></pre>
+
+<h3>Exercise B: Trace the efficient frontier numerically</h3>
+<p>Sweep $\lambda$ over a log grid from 0.01 to 100. For each, solve Markowitz. Plot the frontier.</p>
+
+<h3>Exercise C: Verify the two-fund theorem</h3>
+<p>Pick three values of $\lambda$. Solve Markowitz at each. Check that all three optimal weights are linear combinations of $w_{\min}$ and $w_T$. Numerically: stack the three weight vectors as rows. The matrix should have rank 2.</p>
+
+<h3>Exercise D: Tangency Sharpe upper bound</h3>
+<p>Compute $w_T$ analytically and the maximum achievable Sharpe. Compare with a random sample of 1000 random feasible portfolios. None should beat the tangency Sharpe.</p>
+
+<h3>Exercise E: Closed-form vs numerical</h3>
+<p>For an unconstrained problem, the closed form is exact. Solve the same problem with cvxpy and verify the weights match to 6 decimals. Then add a long-only constraint and observe the divergence.</p>
+
+<h2 id="s_test">8. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>Why does the tangency portfolio formula have $(\mu - r_f \mathbf{1})$ rather than just $\mu$? What changes if you use $\mu$?</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>Modify the Markowitz cvxpy code to add a leverage cap: $\sum_i |w_i| \le 1.5$. Hint: use <code>cp.norm(w, 1)</code>.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>Given $\mu = [0.08, 0.04]$, $\sigma = [0.15, 0.05]$, $\rho = -0.2$, $r_f = 0.02$, compute the tangency weights by hand and the maximum Sharpe. Verify in cvxpy.</p>
+</div>
+
+<div class="nav">
+  <span><a href="lesson_03_risk_measures.html">← Lesson 3</a></span>
+  <span><a href="lesson_06_kkt_constraints.html">Next: Lesson 6, KKT and constraints →</a></span>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+      throwOnError: false
+    });
+  }
+});
+
+function linspace(a, b, n) { const out = []; for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1)); return out; }
+
+// --- 5-asset universe ---
+const N = 5;
+const mu_base = [0.08, 0.04, 0.06, 0.10, 0.05]; // SPY, AGG, GLD, EM, IG
+const sigma_v = [0.15, 0.05, 0.18, 0.20, 0.08];
+const rho = [
+  [1.0, -0.2, 0.1,  0.7, 0.3],
+  [-0.2, 1.0, 0.0, -0.1, 0.6],
+  [0.1,  0.0, 1.0,  0.2, 0.1],
+  [0.7, -0.1, 0.2,  1.0, 0.3],
+  [0.3,  0.6, 0.1,  0.3, 1.0],
+];
+function buildSigma(sigmas, rhoMat) {
+  const S = [];
+  for (let i = 0; i < sigmas.length; i++) {
+    const row = [];
+    for (let j = 0; j < sigmas.length; j++) row.push(sigmas[i] * sigmas[j] * rhoMat[i][j]);
+    S.push(row);
+  }
+  return S;
+}
+
+// --- linalg utilities ---
+function matMul(A, B) {
+  const m = A.length, n = B[0].length, k = B.length;
+  const out = Array.from({length: m}, () => new Array(n).fill(0));
+  for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) for (let p = 0; p < k; p++) out[i][j] += A[i][p] * B[p][j];
+  return out;
+}
+function matVec(A, v) { return A.map(row => row.reduce((s, a, i) => s + a * v[i], 0)); }
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function scale(v, c) { return v.map(x => x * c); }
+function add(a, b) { return a.map((x, i) => x + b[i]); }
+function sub(a, b) { return a.map((x, i) => x - b[i]); }
+function ones(n) { return new Array(n).fill(1); }
+
+// Gauss-Jordan inverse for 5x5 PSD matrix
+function inv(A) {
+  const n = A.length;
+  const M = A.map((row, i) => row.concat(Array.from({length: n}, (_, j) => (i === j ? 1 : 0))));
+  for (let i = 0; i < n; i++) {
+    let pivot = M[i][i];
+    if (Math.abs(pivot) < 1e-12) {
+      for (let r = i + 1; r < n; r++) {
+        if (Math.abs(M[r][i]) > 1e-12) { [M[i], M[r]] = [M[r], M[i]]; pivot = M[i][i]; break; }
+      }
+    }
+    for (let j = 0; j < 2 * n; j++) M[i][j] /= pivot;
+    for (let r = 0; r < n; r++) if (r !== i) {
+      const f = M[r][i];
+      for (let j = 0; j < 2 * n; j++) M[r][j] -= f * M[i][j];
+    }
+  }
+  return M.map(row => row.slice(n));
+}
+
+function markowitzClosedForm(mu, Sigma, lam) {
+  const SigmaInv = inv(Sigma);
+  const A = dot(ones(mu.length), matVec(SigmaInv, ones(mu.length)));
+  const SigmaInvOne = matVec(SigmaInv, ones(mu.length));
+  const SigmaInvMu = matVec(SigmaInv, mu);
+  const B = dot(ones(mu.length), SigmaInvMu);
+  const w_min = scale(SigmaInvOne, 1 / A);
+  const tilt = sub(SigmaInvMu, scale(SigmaInvOne, B / A));
+  return add(w_min, scale(tilt, 1 / lam));
+}
+function tangencyPortfolio(mu, Sigma, rf) {
+  const excess = mu.map(x => x - rf);
+  const SigmaInv = inv(Sigma);
+  const num = matVec(SigmaInv, excess);
+  const den = num.reduce((s, x) => s + x, 0);
+  return num.map(x => x / den);
+}
+
+function updateFrontier() {
+  const lam = parseFloat(document.getElementById('lam').value);
+  const shift = parseFloat(document.getElementById('shift').value) / 10000;
+  const rf = parseFloat(document.getElementById('rf').value) / 100;
+  document.getElementById('lam_v').textContent = lam.toFixed(2);
+  document.getElementById('shift_v').textContent = (shift * 10000).toFixed(0);
+  document.getElementById('rf_v').textContent = (rf * 100).toFixed(1) + '%';
+
+  const mu = mu_base.slice(); mu[0] += shift;
+  const Sigma = buildSigma(sigma_v, rho);
+
+  // Frontier: sweep lam from 0.1 to 30
+  const lamGrid = linspace(0.1, 30, 80);
+  const frontier_x = [], frontier_y = [];
+  for (const l of lamGrid) {
+    const w = markowitzClosedForm(mu, Sigma, l);
+    const m = dot(w, mu);
+    const v = dot(w, matVec(Sigma, w));
+    frontier_x.push(Math.sqrt(Math.max(0, v)));
+    frontier_y.push(m);
+  }
+
+  // Current portfolio
+  const w_curr = markowitzClosedForm(mu, Sigma, lam);
+  const m_curr = dot(w_curr, mu);
+  const v_curr = dot(w_curr, matVec(Sigma, w_curr));
+  const sigma_curr = Math.sqrt(Math.max(0, v_curr));
+
+  // Tangency
+  const w_T = tangencyPortfolio(mu, Sigma, rf);
+  const m_T = dot(w_T, mu);
+  const v_T = dot(w_T, matVec(Sigma, w_T));
+  const sigma_T = Math.sqrt(Math.max(0, v_T));
+  const sr_T = (m_T - rf) / sigma_T;
+
+  // CML
+  const cml_x = linspace(0, Math.max(...frontier_x) * 1.1, 50);
+  const cml_y = cml_x.map(x => rf + sr_T * x);
+
+  // Individual assets
+  const asset_x = sigma_v;
+  const asset_y = mu;
+  const asset_names = ['SPY', 'AGG', 'GLD', 'EM Eq', 'IG Bond'];
+
+  document.getElementById('opt_mean').textContent = (m_curr * 100).toFixed(2) + '%';
+  document.getElementById('opt_vol').textContent = (sigma_curr * 100).toFixed(2) + '%';
+  document.getElementById('opt_sr').textContent = ((m_curr - rf) / sigma_curr).toFixed(3);
+  document.getElementById('tan_sr').textContent = sr_T.toFixed(3);
+
+  Plotly.react('frontier_plot', [
+    { x: frontier_x, y: frontier_y, mode: 'lines', name: 'Efficient frontier', line: { color: '#2b6cb0', width: 2.5 } },
+    { x: cml_x, y: cml_y, mode: 'lines', name: 'Capital Market Line', line: { color: '#22543d', width: 2, dash: 'dash' } },
+    { x: asset_x, y: asset_y, mode: 'markers+text', name: 'Individual assets', marker: { size: 10, color: '#c05621' }, text: asset_names, textposition: 'top center' },
+    { x: [sigma_curr], y: [m_curr], mode: 'markers', name: 'Optimal at $\\lambda$', marker: { size: 14, color: '#c53030', symbol: 'star' } },
+    { x: [sigma_T], y: [m_T], mode: 'markers', name: 'Tangency', marker: { size: 14, color: '#22543d', symbol: 'diamond' } },
+    { x: [0], y: [rf], mode: 'markers', name: 'Risk-free', marker: { size: 10, color: '#744210' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: 'Portfolio volatility', range: [0, Math.max(...frontier_x) * 1.15] },
+    yaxis: { title: 'Portfolio expected return' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['lam', 'shift', 'rf'].forEach(id => document.getElementById(id).addEventListener('input', updateFrontier));
+updateFrontier();
+</script>
+
+</body>
+</html>

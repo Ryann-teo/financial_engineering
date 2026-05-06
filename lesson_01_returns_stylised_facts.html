@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 1: Returns and Stylised Facts</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg: #fafbfc; --fg: #1a202c; --muted: #4a5568;
+    --primary: #2b6cb0; --accent: #c05621;
+    --card: #fff; --border: #e2e8f0;
+    --insight: #fffbea; --insight-border: #f59e0b;
+    --code-bg: #1a202c; --code-fg: #e2e8f0;
+    --demo-bg: #f7fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 920px; margin: 0 auto; padding: 2rem;
+    line-height: 1.65; color: var(--fg); background: var(--bg);
+  }
+  h1 { font-size: 2.1rem; color: var(--primary); margin-bottom: 0.2rem; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 2rem; }
+  h2 { color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 0.4rem; margin-top: 3rem; }
+  h3 { color: var(--accent); margin-top: 2rem; }
+  p { margin: 0.8rem 0; }
+  .toc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.5rem; margin: 1.5rem 0;
+  }
+  .toc ol { margin: 0.4rem 0 0 0; padding-left: 1.4rem; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .demo {
+    background: var(--demo-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.2rem 1.4rem; margin: 1.5rem 0;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: flex-end; margin-bottom: 1rem; }
+  .control { display: flex; flex-direction: column; min-width: 130px; }
+  .control label { font-size: 0.85rem; color: var(--muted); font-weight: 600; margin-bottom: 0.3rem; }
+  .control input[type="range"] { width: 180px; }
+  .control select, .control input[type="number"] {
+    padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 0.95rem;
+  }
+  .value { font-family: 'JetBrains Mono', 'Courier New', monospace; color: var(--accent); font-weight: 600; }
+  .plot { background: white; border-radius: 6px; padding: 0.5rem; }
+  .insight {
+    background: var(--insight); border-left: 4px solid var(--insight-border);
+    padding: 0.8rem 1.2rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0;
+  }
+  .insight strong { color: #92400e; }
+  .formula {
+    background: #ebf4ff; padding: 0.6rem 1rem; border-radius: 6px; margin: 0.8rem 0;
+    border-left: 3px solid var(--primary);
+  }
+  code { background: var(--code-bg); color: var(--code-fg); padding: 0.1rem 0.4rem;
+         border-radius: 3px; font-size: 0.88em; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  pre {
+    background: var(--code-bg); color: var(--code-fg); padding: 1rem 1.2rem;
+    border-radius: 6px; overflow-x: auto; font-size: 0.88em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  .selftest {
+    background: #ebf8ff; border: 1px solid #63b3ed; border-radius: 8px;
+    padding: 1rem 1.5rem; margin: 2rem 0;
+  }
+  .selftest h3 { color: var(--primary); margin-top: 0; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.8rem 0; }
+  .stat { display: flex; justify-content: space-between; padding: 0.3rem 0.6rem;
+          background: white; border-radius: 4px; border: 1px solid var(--border); }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .nav { display: flex; justify-content: space-between; margin: 3rem 0 1rem; padding-top: 1rem;
+         border-top: 1px solid var(--border); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 1: Returns and Stylised Facts</h1>
+<p class="subtitle">Module A, Week 1, Lesson 1. Build the language of returns from the ground up, then meet the five empirical facts that every later module assumes.</p>
+
+<div class="toc">
+  <strong>What you will learn</strong>
+  <ol>
+    <li><a href="#s1">What a return actually is</a></li>
+    <li><a href="#s2">Simple returns vs log returns</a></li>
+    <li><a href="#s3">Why log returns aggregate across time</a></li>
+    <li><a href="#s4">Stylised fact one: heavy tails</a></li>
+    <li><a href="#s5">Stylised fact two: volatility clustering</a></li>
+    <li><a href="#s6">Stylised fact three: the leverage effect</a></li>
+    <li><a href="#s7">Stylised fact four: aggregational Gaussianity</a></li>
+    <li><a href="#s8">Stylised fact five: zero linear autocorrelation</a></li>
+    <li><a href="#s9">Self test</a></li>
+  </ol>
+</div>
+
+<h2 id="s0">0. Reading the controls: what every slider means</h2>
+<p>Before you start dragging things around, here is what each control actually does in the math. Skim once now, refer back as needed.</p>
+
+<h3>Random seed</h3>
+<p>Every "random" number on this page comes from a <strong>pseudo-random number generator</strong> (PRNG), specifically the Mulberry32 algorithm. A PRNG is deterministic: feed it the same starting integer (the seed) and it produces the same sequence forever. This is a feature, not a bug.</p>
+<p>Two reasons we expose the seed. First, <strong>reproducibility</strong>: a backtest with a fixed seed gives the same result on every machine. If a paper does not specify its seed, you cannot reproduce its plots exactly. Second, <strong>sample variation</strong>: sliding the seed shows you different realisations from the same underlying probability law. The lesson is that any single sample is one draw from a much wider distribution of possible histories. A 5-year backtest is a single data point about market behaviour, not the truth.</p>
+
+<h3>Degrees of freedom (df) of the Student t distribution</h3>
+<p>The Student t generalises the normal. The mathematical construction: if $Z \sim N(0,1)$ and $V \sim \chi^2_{df}$ are independent, then $T = Z / \sqrt{V/df}$ has the t distribution with df degrees of freedom.</p>
+<p>Why does this matter? When df is small, the chi-squared denominator can hit small values often, blowing up the t variable into the tails. As df grows, $V/df$ concentrates around 1 (law of large numbers on $V$), so $T$ approaches $Z$. Concretely: <strong>df = 3</strong> has tails so heavy that the kurtosis is infinite. <strong>df = 5</strong> has finite kurtosis but it is about 6 (excess kurtosis 3, double the normal). <strong>df = ∞</strong> is the normal.</p>
+<p>Empirically: equity index returns fit df ≈ 4 to 6 at daily frequency. Crypto fits df ≈ 3. Bonds fit df ≈ 8 to 10. The Gaussian (df = ∞) fits nothing in finance at high frequency.</p>
+
+<h3>Years of history</h3>
+<p>One "year" in our simulator equals 252 trading days. Sliding from 2 to 20 years gives 504 to 5040 daily observations. More observations sharpen statistical estimates by a factor of $\sqrt{n}$. But more history also drags in older regimes that may not match the present (1990s low vol, 2008 GFC, 2020 pandemic, 2022 inflation shock). The bias-variance tradeoff in time series.</p>
+
+<h3>GARCH parameters $\alpha$ and $\beta$</h3>
+<p>The variance equation is $\sigma_t^2 = \omega + \alpha r_{t-1}^2 + \beta \sigma_{t-1}^2$. Three parameters with distinct roles.</p>
+<p><strong>$\omega$</strong> anchors long-run variance. The unconditional variance is $\omega / (1 - \alpha - \beta)$ when $\alpha + \beta < 1$.</p>
+<p><strong>$\alpha$</strong> is the "ARCH effect", how much yesterday's squared return feeds into today's variance. Bigger $\alpha$ means returns react faster to shocks.</p>
+<p><strong>$\beta$</strong> is the "persistence", how much yesterday's variance carries over. Bigger $\beta$ means vol regimes last longer.</p>
+<p>For real equity indices, fitted values are typically $\alpha \approx 0.05$ and $\beta \approx 0.93$. The sum 0.98 is what creates the long memory you see in the ACF of $|r_t|$.</p>
+
+<h3>Leverage parameter</h3>
+<p>The Black-Christie asymmetric vol effect. We add an extra $|\text{leverage}| \cdot r_{t-1}^2$ to the GARCH equation only when $r_{t-1} < 0$. Negative leverage means down moves boost vol more than up moves of equal magnitude. SPY has leverage around $-0.4$ in fitted models. VIX has positive leverage (vol of vol rises with VIX). Bonds and gold are roughly symmetric.</p>
+
+<h3>Aggregation horizon</h3>
+<p>How many daily returns we sum to form one observation. Horizon = 1 keeps daily returns. Horizon = 21 ≈ monthly returns. Horizon = 252 ≈ annual. The CLT (Section 9 below) tells us that summing returns drags the distribution toward normal regardless of how heavy-tailed the individual returns are, as long as variance is finite.</p>
+
+<h3>ACF lag count</h3>
+<p>Autocorrelation $\rho(h)$ is computed for each lag $h$. Lag 1 is today vs yesterday. Lag 22 is today vs about a month ago. The slider controls how many lags we display. The dashed grey bands at $\pm 1.96/\sqrt{n}$ are 95% confidence bounds: any bar inside is statistically indistinguishable from zero under the white noise null.</p>
+
+<h2 id="s1">1. What a return actually is</h2>
+<p>An asset has a price $P_t$ at each time $t$. The return is the percentage change. That is the entire definition. Everything in finance after this is variations on the theme.</p>
+
+<p>The simple return over one period is</p>
+<div class="formula">$$r_t = \frac{P_t - P_{t-1}}{P_{t-1}} = \frac{P_t}{P_{t-1}} - 1$$</div>
+
+<p>Drag the sliders below. Move yesterday's price and today's price. Watch the return.</p>
+
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Price yesterday $P_{t-1}$: <span class="value" id="p0_v">100.00</span></label>
+      <input type="range" id="p0" min="50" max="200" step="0.5" value="100">
+    </div>
+    <div class="control">
+      <label>Price today $P_t$: <span class="value" id="p1_v">102.00</span></label>
+      <input type="range" id="p1" min="50" max="200" step="0.5" value="102">
+    </div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Simple return</span><span class="stat-value" id="r_simple">+2.0000%</span></div>
+    <div class="stat"><span class="stat-label">Log return</span><span class="stat-value" id="r_log">+1.9803%</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Notice:</strong> for small moves (under 5%) the simple and log returns are almost equal. For a 50% drop or a doubling, they differ a lot. That is not a bug. They measure different things.
+</div>
+
+<h2 id="s2">2. Simple returns vs log returns</h2>
+
+<p>The log return is</p>
+<div class="formula">$$r^{\log}_t = \ln\left(\frac{P_t}{P_{t-1}}\right) = \ln(1 + r_t)$$</div>
+
+<p>Two reasons we use both. <strong>Simple returns aggregate across assets</strong>: a portfolio's simple return is $w_1 r_1 + w_2 r_2$ exactly. Log returns do not aggregate this way. <strong>Log returns aggregate across time</strong>: the log return over $n$ days equals the sum of daily log returns. Simple returns require multiplication.</p>
+
+<p>Here is the proof of the time-aggregation property:</p>
+<div class="formula">$$r^{\log}_{[1,n]} = \ln\left(\frac{P_n}{P_0}\right) = \ln\left(\frac{P_n}{P_{n-1}} \cdot \frac{P_{n-1}}{P_{n-2}} \cdots \frac{P_1}{P_0}\right) = \sum_{t=1}^{n} r^{\log}_t$$</div>
+
+<h3>Live: simple vs log over a path</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Daily mean (annualised %): <span class="value" id="mu_v">8</span></label>
+      <input type="range" id="mu" min="-10" max="30" step="0.5" value="8">
+    </div>
+    <div class="control">
+      <label>Daily vol (annualised %): <span class="value" id="vol_v">20</span></label>
+      <input type="range" id="vol" min="5" max="80" step="1" value="20">
+    </div>
+    <div class="control">
+      <label>Days simulated: <span class="value" id="n_v">252</span></label>
+      <input type="range" id="n" min="20" max="2520" step="10" value="252">
+    </div>
+    <div class="control">
+      <label>Random seed: <span class="value" id="seed_v">42</span></label>
+      <input type="range" id="seed" min="1" max="200" step="1" value="42">
+    </div>
+  </div>
+  <div id="path_plot" class="plot" style="height: 350px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Sum of log returns</span><span class="stat-value" id="sum_log">0</span></div>
+    <div class="stat"><span class="stat-label">Sum of simple returns</span><span class="stat-value" id="sum_simple">0</span></div>
+    <div class="stat"><span class="stat-label">Total log return $\ln(P_n/P_0)$</span><span class="stat-value" id="actual_log">0</span></div>
+    <div class="stat"><span class="stat-label">Total simple return $P_n/P_0 - 1$</span><span class="stat-value" id="actual_simple">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Aha:</strong> the sum of daily log returns equals the total log return exactly. The sum of daily simple returns does not equal the total simple return. That single property is why every academic paper uses log returns.
+</div>
+
+<h3>The Python translation</h3>
+<pre><code>import numpy as np
+import pandas as pd
+
+prices = pd.Series([100, 102, 105, 103, 108])
+
+simple_returns = prices.pct_change().dropna()
+log_returns = np.log(prices / prices.shift(1)).dropna()
+
+print(simple_returns.sum())         # 0.0795...
+print(log_returns.sum())            # 0.0770...
+print(np.log(prices.iloc[-1] / prices.iloc[0]))  # exactly equal to log_returns.sum()</code></pre>
+
+<h2 id="s3">3. Annualisation</h2>
+<p>Returns are reported per period. To compare a daily Sharpe to a monthly Sharpe you have to standardise. The <strong>annualisation factor</strong> $k$ is the number of periods per year: 252 for daily, 52 for weekly, 12 for monthly.</p>
+
+<p>For the mean: $\mu_\text{ann} = \mu_\text{period} \cdot k$. For the volatility: $\sigma_\text{ann} = \sigma_\text{period} \cdot \sqrt{k}$. The volatility scales with $\sqrt{k}$ because variances add (under independence) but standard deviations do not.</p>
+
+<div class="insight">
+  <strong>Why $\sqrt{k}$?</strong> If daily returns are IID with variance $\sigma^2$, the variance of an $n$-day sum is $n \sigma^2$. The standard deviation is $\sqrt{n} \sigma$. This is the famous "square root of time" rule, and it breaks the moment returns are not IID, which they never are exactly.
+</div>
+
+<h2 id="s4">4. Stylised fact one: heavy tails</h2>
+<p>Open any introductory finance textbook and it will assume returns are normally distributed. Real returns are not. The tails are far too heavy.</p>
+
+<p>The Gaussian density falls off like $e^{-x^2/2}$, which means the probability of a 5 sigma event is about 1 in 3.5 million. Empirically, equity markets see 5 sigma days every few years. The Student t distribution with 4 to 6 degrees of freedom fits much better.</p>
+
+<h3>Live: Gaussian vs Student t</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Asset profile: </label>
+      <select id="asset_pick">
+        <option value="spy">SPY (equity, df=5)</option>
+        <option value="agg">AGG (bonds, df=8)</option>
+        <option value="btc">BTC (crypto, df=3)</option>
+        <option value="gld">GLD (gold, df=6)</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>t degrees of freedom: <span class="value" id="df_v">5</span></label>
+      <input type="range" id="df" min="3" max="30" step="1" value="5">
+    </div>
+    <div class="control">
+      <label>Sample size: <span class="value" id="n2_v">2520</span></label>
+      <input type="range" id="n2" min="500" max="10000" step="100" value="2520">
+    </div>
+  </div>
+  <div id="hist_plot" class="plot" style="height: 350px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Empirical sample skew</span><span class="stat-value" id="emp_skew">0</span></div>
+    <div class="stat"><span class="stat-label">Empirical excess kurtosis</span><span class="stat-value" id="emp_kurt">0</span></div>
+    <div class="stat"><span class="stat-label">3 sigma exceedances</span><span class="stat-value" id="emp_3sig">0</span></div>
+    <div class="stat"><span class="stat-label">Normal expected (≈0.27% × n)</span><span class="stat-value" id="exp_3sig">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Drag the df slider.</strong> Push it down to 3. The blue empirical histogram balloons in the tails compared to the red normal. Push df up to 30. The Student t curve converges to the normal. df is the dial that controls "how heavy are the tails".
+</div>
+
+<h2 id="s_df">4b. Deep dive: degrees of freedom in detail</h2>
+
+<p>One thing to nail down before moving on. <strong>Lower df means heavier tails. Higher df means thinner tails.</strong> The Student t at df $= \infty$ <em>is</em> the normal distribution exactly. df $= 3$ has tails so heavy that the kurtosis is infinite. So when you slide df up from 3 toward 30 in the heavy-tails demo, the empirical histogram becomes <em>better fit</em> by the normal, not worse.</p>
+
+<div class="insight">
+  <strong>The direction in one line:</strong> df is a "Gaussian-ness" dial. Crank df up, you converge to the normal. Crank df down, you diverge from the normal in the tails specifically. df is not a "fatness" dial.
+</div>
+
+<h3>What degrees of freedom actually are</h3>
+<p>The Student t is constructed from two independent random variables. Let $Z \sim N(0, 1)$ (standard normal) and $V \sim \chi^2_\nu$ (chi-squared with $\nu$ degrees of freedom). Define</p>
+<div class="formula">$$T = \frac{Z}{\sqrt{V / \nu}}$$</div>
+<p>Then $T$ has the Student t distribution with $\nu$ degrees of freedom. The chi-squared $V$ is itself the sum of $\nu$ independent squared normals: $V = G_1^2 + G_2^2 + \cdots + G_\nu^2$.</p>
+<p>So df = $\nu$ literally counts how many independent normal squareds you stack into the denominator. This came out of the small-sample statistics literature (Gosset's 1908 paper at Guinness): if you estimate the standard deviation of a sample of size $n$, the t-statistic for the mean has df = $n - 1$. The "degrees of freedom" name comes from the constraint that the deviations from the mean must sum to zero.</p>
+
+<h3>Why low df produces heavy tails</h3>
+<p>The denominator $\sqrt{V / \nu}$ is what creates the tail behaviour. When $\nu$ is small (say 3), the chi-squared denominator can occasionally take very small values (a chi-squared with 3 df has a non-trivial probability of being below 0.5). When the denominator is small, $T$ blows up, which produces the extreme tail values.</p>
+<p>As $\nu$ grows, $V / \nu$ concentrates around 1 (law of large numbers: $V$ is the sum of $\nu$ unit-variance things, so $V / \nu \to 1$ almost surely). The denominator approaches 1, and $T$ approaches $Z$, the standard normal.</p>
+<p>Quantitatively, the kurtosis of a Student t with $\nu$ df is</p>
+<div class="formula">$$\text{kurtosis} = 3 + \frac{6}{\nu - 4} \quad \text{for } \nu > 4$$</div>
+<p>which gives</p>
+<ul>
+  <li>$\nu = 5$: kurtosis 9, excess kurtosis 6 (twice the normal).</li>
+  <li>$\nu = 6$: kurtosis 6, excess 3.</li>
+  <li>$\nu = 10$: kurtosis 4, excess 1.</li>
+  <li>$\nu = 30$: kurtosis 3.46, excess 0.46. Already nearly normal.</li>
+  <li>$\nu = \infty$: kurtosis 3 exactly.</li>
+</ul>
+<p>For $\nu \le 4$ kurtosis is <em>infinite</em>. For $\nu \le 2$ even the variance is infinite. df = 1 is the Cauchy distribution, which has no defined mean.</p>
+
+<h3>What the right df is for each asset class, and why</h3>
+
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid var(--border); text-align: left;">Asset class</th>
+      <th style="padding: 0.5rem; border: 1px solid var(--border);">Typical df (daily)</th>
+      <th style="padding: 0.5rem; border: 1px solid var(--border); text-align: left;">Why</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">US equity index (SPY)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">4 to 6</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Diversified across 500 names so idiosyncratic kurtosis averages out. Index left tail dominated by macro shocks (1987, 2008, 2020).</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Single stock</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">3 to 5</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Idiosyncratic earnings, M&amp;A, fraud events. Heavier tails than the index.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Investment grade bonds (AGG)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">8 to 12</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Returns dominated by smooth duration and credit-spread changes. Tail events are rate spikes (1994, 2022) and credit blowouts.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">High yield bonds (HYG)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">4 to 6</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Default risk creates jumps on the left tail. Equity-like.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Gold (GLD)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">5 to 7</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Sensitive to inflation and central-bank surprises. Symmetric tails.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Oil (USO)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">3 to 5</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Supply shocks, OPEC decisions, futures-roll dynamics. Famously fat tails (April 2020 negative price).</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">G10 FX (EURUSD, USDJPY)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">6 to 10</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Liquid markets, intervention-bounded most of the time. SNB 2015 was a 30 sigma event under Gaussian assumptions.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">EM FX (USDBRL, USDTRY)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">3 to 5</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Crisis prone, illiquid, capital controls. Tails are political.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Crypto (BTC, ETH)</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">2.5 to 3.5</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">No regulator, leverage cycles, exchange failures. Often borderline-infinite-variance regime.</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">VIX index</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border); text-align: center;">3 to 4</td>
+      <td style="padding: 0.5rem; border: 1px solid var(--border);">Vol of vol with positive skew. Spikes higher than it can fall.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>How to estimate df from data</h3>
+<p>The standard approach is maximum likelihood. In Python:</p>
+<pre><code>from scipy import stats
+df_t, mu_t, sigma_t = stats.t.fit(returns)</code></pre>
+<p>The fit minimises the negative log-likelihood. Note that maximum likelihood for the t distribution does not have a closed form; <code>scipy</code> uses iterative numerical optimisation. With 1000 daily returns, the standard error on the fitted df is about $\pm 1$ for df near 5, so single-asset df estimates are noisy.</p>
+
+<h3>Three rules of thumb when using df in models</h3>
+<p><strong>1. Round to the nearest integer.</strong> The t distribution is defined for any positive real df, but the difference between df = 5 and df = 5.3 is invisible. Use 5.</p>
+<p><strong>2. Cap at df = 30.</strong> Above 30, the t is indistinguishable from normal in any practical setting. If your fit gives df = 50, just use a normal.</p>
+<p><strong>3. Floor at df = 3.</strong> Below 3, the variance is infinite (or near infinite), which breaks every variance-based portfolio method. If your data fits df below 3, you are in a regime where Markowitz cannot help and you should switch to CVaR or robust methods (Lessons 12 and 16).</p>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 99):</strong> Six different ways to estimate "the same" volatility. Close-to-close, Parkinson (high-low), Garman-Klass (OHLC), Rogers-Satchell, Yang-Zhang, and intraday realised variance. The choice of estimator changes signal-to-noise by a factor of 3 or more. Yang-Zhang is usually the best OHLC-based estimator; intraday realised variance is unbiased but needs clean tick data. Macrosynergy's production default is EWMA close-to-close with an 11-day half-life. That single number flows into the vol-targeting layer (Lesson 21) of every published strategy.
+</div>
+
+<h2 id="s5">5. Stylised fact two: volatility clustering</h2>
+<p>Returns themselves look uncorrelated: if today is up, tomorrow is roughly 50/50 up or down. But absolute returns and squared returns are highly autocorrelated. Big days cluster together. Calm days cluster together. This is volatility clustering, the most stable empirical regularity in finance.</p>
+
+<p>The autocorrelation function (ACF) at lag $h$ is</p>
+<div class="formula">$$\rho_h(x) = \frac{\text{Cov}(x_t, x_{t-h})}{\text{Var}(x_t)}$$</div>
+
+<p>For raw returns $\rho_h \approx 0$ for $h \ge 1$. For absolute returns $\rho_h$ stays high (often above 0.2) for many lags.</p>
+
+<h3>Live: ACF of returns vs absolute returns</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>GARCH persistence $\beta$: <span class="value" id="beta_v">0.93</span></label>
+      <input type="range" id="beta" min="0.50" max="0.99" step="0.01" value="0.93">
+    </div>
+    <div class="control">
+      <label>GARCH ARCH $\alpha$: <span class="value" id="alpha_v">0.05</span></label>
+      <input type="range" id="alpha" min="0.00" max="0.30" step="0.01" value="0.05">
+    </div>
+    <div class="control">
+      <label>Number of lags: <span class="value" id="lags_v">40</span></label>
+      <input type="range" id="lags" min="5" max="100" step="1" value="40">
+    </div>
+  </div>
+  <div id="acf_plot" class="plot" style="height: 380px;"></div>
+</div>
+
+<div class="insight">
+  <strong>Crank $\beta$ to 0.99.</strong> The ACF of |returns| stays elevated for 50+ lags. That is a market in persistent vol regime. Drop $\beta$ to 0.6: clustering disappears almost immediately. $\alpha + \beta$ near 1 is what creates the long memory you see in real markets.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 105, 153):</strong> The HAR (Heterogeneous Autoregressive, art 153) model uses daily, weekly, and monthly averages of past realised variance to forecast today's variance. It is dead simple (OLS), interpretable, and beats GARCH on most forecasting horseraces. Article 105 finds that LSTM neural networks beat both GARCH and HAR on S&P 500 realised vol in calm and stressed regimes, by roughly 10% out-of-sample R². The production trade-off: HAR is debuggable, LSTM is a black box. Most MS strategies use HAR or EWMA, not LSTM, because debuggability matters more than 10 bps of forecast accuracy.
+</div>
+
+<h2 id="s6">6. Stylised fact three: the leverage effect</h2>
+<p>For equities specifically, negative returns predict <em>higher</em> future volatility more than positive returns of the same magnitude do. Black called this the "leverage effect" because if a firm's stock falls, its debt to equity rises, which mechanically raises equity vol. The label has stuck even though the mechanism is debated.</p>
+
+<p>The empirical signature: $\text{Corr}(r_t, \sigma_{t+1}) < 0$, often around $-0.3$ to $-0.5$ for major equity indices.</p>
+
+<h3>Live: return vs next day vol</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Leverage strength: <span class="value" id="lev_v">-0.4</span></label>
+      <input type="range" id="lev" min="-0.8" max="0.0" step="0.05" value="-0.4">
+    </div>
+    <div class="control">
+      <label>Sample size: <span class="value" id="lev_n_v">1500</span></label>
+      <input type="range" id="lev_n" min="500" max="5000" step="100" value="1500">
+    </div>
+  </div>
+  <div id="lev_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Corr(return, next vol)</span><span class="stat-value" id="lev_corr">0</span></div>
+    <div class="stat"><span class="stat-label">Mean vol after 5% down day</span><span class="stat-value" id="vol_after_down">0</span></div>
+  </div>
+</div>
+
+<h2 id="s7">7. Stylised fact four: aggregational Gaussianity</h2>
+<p>Daily returns are heavy tailed. Yearly returns are nearly Gaussian. Why? The Central Limit Theorem says that if returns are roughly independent, sums of many of them tend to a normal distribution. Aggregating from daily to yearly means summing about 252 daily returns. That is enough averaging to wash out most tail behaviour.</p>
+
+<p>This is a double edged sword. <strong>Long horizon</strong> portfolio decisions can use Gaussian assumptions. <strong>Short horizon</strong> risk management cannot.</p>
+
+<h3>Live: morph the histogram by frequency</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Aggregation horizon (days): <span class="value" id="agg_v">1</span></label>
+      <input type="range" id="agg" min="1" max="252" step="1" value="1">
+    </div>
+    <div class="control">
+      <label>Source df (daily t): <span class="value" id="src_df_v">5</span></label>
+      <input type="range" id="src_df" min="3" max="20" step="1" value="5">
+    </div>
+  </div>
+  <div id="agg_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span class="stat-label">Excess kurtosis at this horizon</span><span class="stat-value" id="agg_kurt">0</span></div>
+    <div class="stat"><span class="stat-label">Effective df fitted</span><span class="stat-value" id="agg_df">0</span></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Drag the horizon slider from 1 to 252.</strong> The blue empirical histogram morphs from peaked-and-fat-tailed (heavy t shape) toward the smooth bell curve. Excess kurtosis falls toward zero. The effective fitted df rises toward infinity. Aggregational Gaussianity is no longer a phrase, it is a thing you watched happen.
+</div>
+
+<div class="insight" style="background: #f0fff4; border-left-color: #38a169;">
+  <strong>In practice (Macrosynergy art 84):</strong> The Hurst exponent labels assets as trending ($H > 0.5$), random walk ($H = 0.5$), or mean-reverting ($H < 0.5$). Computed via R/S analysis on rolling windows. EM FX in trending regimes shows $H \approx 0.6$ to $0.7$. Major equity indices at monthly horizons sit near $0.5$ (random walk, hard to trend-follow). Used as a regime gate in Macrosynergy: only run trend-following strategies on assets whose realised $H$ is consistently above $0.55$. The Hurst test is also a clean way to demonstrate that volatility clustering ($|r|$ trends) and return-level mean reversion (the rolling Hurst on returns sits near 0.5) are different phenomena.
+</div>
+
+<h2 id="s8">8. Stylised fact five: zero linear autocorrelation in returns</h2>
+<p>Despite all the structure in volatility, raw returns themselves have essentially zero autocorrelation. This is not because markets are inefficient or efficient: it is because if there were strong autocorrelation, traders would arbitrage it away in seconds. Any persistent return autocorrelation has to be tiny, transient, or buried under transaction costs.</p>
+
+<p>This is the empirical foundation for the random walk hypothesis. It does <em>not</em> mean returns are unpredictable. It means linear forecasts based on past returns alone are weak. Almost all alpha comes from non-linear features (regimes, fundamentals, flows) rather than autoregressive structure.</p>
+
+<h2 id="s_math">9. Mathematical companion: derivations and proofs</h2>
+<p>The textbook material that underpins everything you saw. Read once now to fix the foundations. Come back when you build models in later modules.</p>
+
+<h3>9.1 Why log returns aggregate across time</h3>
+<p>The price ratio over $n$ days is a product:</p>
+<div class="formula">$$\frac{P_n}{P_0} = \prod_{t=1}^{n} \frac{P_t}{P_{t-1}}$$</div>
+<p>Take the log of both sides:</p>
+<div class="formula">$$\ln\frac{P_n}{P_0} = \sum_{t=1}^n \ln\frac{P_t}{P_{t-1}} = \sum_t r_t^{\log}$$</div>
+<p>Products become sums. Variance also adds nicely under independence: $\text{Var}\left(\sum_t r_t^{\log}\right) = \sum_t \text{Var}(r_t^{\log})$, which gives the famous $\sigma\sqrt{T}$ scaling. Simple returns do not have this property because $\sum_t r_t \ne (1 + r_1)(1 + r_2)\cdots - 1$. The product expansion creates cross terms.</p>
+
+<h3>9.2 Skewness and kurtosis as standardised moments</h3>
+<p>The third and fourth standardised moments are</p>
+<div class="formula">$$\text{skew}(X) = \mathbb{E}\left[\left(\tfrac{X - \mu}{\sigma}\right)^3\right], \quad \text{kurt}(X) = \mathbb{E}\left[\left(\tfrac{X - \mu}{\sigma}\right)^4\right]$$</div>
+<p>For a normal: skew $= 0$, kurt $= 3$. Throughout finance we report excess kurtosis (kurt $- 3$) so a normal scores zero.</p>
+<p><strong>What skewness measures.</strong> Geometric asymmetry. Negative skew means the left tail is longer than the right. Equity indices have negative skew because crashes drop further than rallies climb in the same time. Trend following has positive skew. Naked option selling has very negative skew. The sign of skew matters more than the magnitude for portfolio decisions.</p>
+<p><strong>The kurtosis myth.</strong> Many sources describe high kurtosis as a "peaked distribution". Westfall (2014) shows this is wrong. Kurtosis is almost entirely about <em>tails</em>. The variable $Z^4$ ($Z$ standardised) is small near the centre and explodes far from it. The expectation $\mathbb{E}[Z^4]$ is dominated by tail mass. High kurtosis means rare extreme events, not a tall central peak.</p>
+
+<h3>9.3 The Central Limit Theorem, formally</h3>
+<p>Lindeberg-Lévy CLT: let $X_1, X_2, \ldots$ be IID with finite mean $\mu$ and variance $\sigma^2 > 0$. Then</p>
+<div class="formula">$$\frac{\sqrt{n}(\bar{X}_n - \mu)}{\sigma} \xrightarrow{d} N(0, 1) \quad \text{as } n \to \infty.$$</div>
+<p>This is what produces aggregational Gaussianity. Three caveats matter for finance.</p>
+<p><strong>Finite variance.</strong> If $X_i$ has infinite variance (e.g. Student t with df $\le 2$), the classical CLT fails. The Generalised CLT replaces the limit with a stable Lévy distribution. Empirically, equity returns appear to have finite variance (df typically above 4) but the convergence to normal is slow.</p>
+<p><strong>Independence.</strong> Real returns are not independent. They are uncorrelated but the squares are correlated (volatility clustering). The CLT still holds under weak dependence, but the convergence rate is slower than the IID case.</p>
+<p><strong>Stationarity.</strong> The CLT assumes the process has a fixed distribution. Markets do not. Regimes shift. So aggregational Gaussianity in real data is only approximate, and only inside roughly stationary windows.</p>
+
+<h3>9.4 ACF properties and the three flavours of white noise</h3>
+<p>The autocorrelation function $\rho(h) = \text{Cov}(r_t, r_{t-h}) / \text{Var}(r_t)$ satisfies $\rho(0) = 1$, $|\rho(h)| \le 1$, and $\rho(h) = \rho(-h)$. A process is <strong>white noise</strong> if $\rho(h) = 0$ for all $h \ne 0$. There are three versions, in order of strength.</p>
+<ul>
+  <li><strong>Uncorrelated white noise.</strong> $\rho(h) = 0$ for $h \ne 0$. Says nothing about higher-order dependence.</li>
+  <li><strong>IID white noise.</strong> $r_t$ are independent and identically distributed. Implies all order moments are uncorrelated.</li>
+  <li><strong>Gaussian white noise.</strong> IID white noise where $r_t \sim N(\mu, \sigma^2)$.</li>
+</ul>
+<p>Asset returns are essentially uncorrelated white noise but they are not IID, because $|r_t|$ has strong autocorrelation. This is precisely the volatility clustering stylised fact.</p>
+
+<h3>9.5 GARCH(1,1) in formal terms</h3>
+<p>Engle (1982) introduced ARCH. Bollerslev (1986) extended it to GARCH:</p>
+<div class="formula">$$r_t = \mu + \sigma_t z_t, \quad z_t \sim \text{IID}(0, 1), \quad \sigma_t^2 = \omega + \alpha r_{t-1}^2 + \beta \sigma_{t-1}^2$$</div>
+<p>The unconditional variance is $\omega / (1 - \alpha - \beta)$ when $\alpha + \beta < 1$. Otherwise the variance is unbounded and the process is non-stationary. Empirical fits to equity indices typically give $\alpha + \beta \approx 0.97$ to $0.99$, which means very long memory but technically still stationary. This is called a "near-integrated GARCH" regime.</p>
+<p>An equivalent formulation that is sometimes more useful: $\sigma_t^2 = \bar{\sigma}^2 + \alpha(r_{t-1}^2 - \bar{\sigma}^2) + \beta(\sigma_{t-1}^2 - \bar{\sigma}^2)$ where $\bar{\sigma}^2$ is the long-run variance. This says today's variance is yesterday's, partially adjusted toward long-run, plus a kick from yesterday's squared shock.</p>
+
+<h3>9.6 Stationarity and ergodicity</h3>
+<p>A process $\{r_t\}$ is <strong>strict stationary</strong> if all joint distributions are time-invariant. It is <strong>weak (covariance) stationary</strong> if mean, variance, and autocovariance do not depend on $t$. <strong>Ergodic</strong> means time averages converge to ensemble averages.</p>
+<p>For empirical estimates to be meaningful, we need both stationarity (so there is a fixed truth to estimate) and ergodicity (so a single sample path tells us about the truth). Real returns are roughly stationary in short windows and clearly non-stationary across regimes. This is the deep reason backtests over 1995 to 2025 are difficult: you are averaging over multiple regimes.</p>
+
+<h3>9.7 The QQ plot, formally</h3>
+<p>A quantile-quantile plot. For each probability $p$ in a grid, plot the empirical $p$-quantile of your data on the vertical axis vs the theoretical $p$-quantile of the reference distribution on the horizontal. If the data follows the reference up to a linear transformation, the points lie on a straight line. <strong>Curvature at the ends</strong> indicates tail mismatch. Real equity returns produce QQ plots that bend down on the left and up on the right relative to a normal: too many extreme losses and too many extreme gains. The fattest tail is usually the left.</p>
+
+<h3>9.8 Why these stylised facts matter for every later lesson</h3>
+<p>Heavy tails kill Gaussian risk models. <strong>Lesson 3</strong> shows you how to handle this with VaR, CVaR, and drawdown. <strong>Lesson 13</strong> shows the covariance-estimation consequences. <strong>Lesson 16</strong> uses CVaR as the optimisation objective.</p>
+<p>Volatility clustering is what makes realised drawdowns much deeper than IID theory predicts. <strong>Lesson 21</strong> uses this to motivate volatility targeting.</p>
+<p>The leverage effect makes the bond-equity correlation negative in calm markets and positive in stress. <strong>Lesson 27</strong> handles this through regime-aware allocation.</p>
+<p>Aggregational Gaussianity is the technical reason monthly and quarterly portfolio decisions can use Gaussian-flavoured optimisation (Markowitz, Lessons 5 to 8) while daily decisions cannot.</p>
+
+<h2 id="s_code">10. Coding exercises (extras)</h2>
+<p>The companion notebook <code>module_a_exercises.ipynb</code> in this folder has 10 fully scaffolded fill-in-the-blank exercises for Lesson 1 with synthetic data and asserts that validate your answers. Open it in Jupyter or VS Code and work through it after reading.</p>
+
+<p>Five additional questions for direct practice without the notebook. Try writing the code on paper first.</p>
+
+<h3>Exercise A: Variance ratio test</h3>
+<p>The variance ratio test compares the variance of $k$-day returns to $k$ times the variance of 1-day returns. Under IID, the ratio equals 1. Significant deviation indicates serial dependence.</p>
+<pre><code>def variance_ratio(returns, k):
+    """Lo-MacKinlay variance ratio at horizon k."""
+    one_day_var = returns.var(ddof=1)
+    k_day_returns = returns.rolling(k).sum().dropna()
+    k_day_var = k_day_returns.var(ddof=1)
+    return k_day_var / (k * one_day_var)
+
+# Apply to SPY at k = 5, 22, 60. Report the ratios.
+# Volatility-clustered series produce ratios > 1 at short horizons.</code></pre>
+
+<h3>Exercise B: Hurst exponent via R/S analysis</h3>
+<p>The Hurst exponent $H$ measures long-range dependence. $H = 0.5$ is a random walk. $H > 0.5$ is persistent. $H < 0.5$ is mean reverting.</p>
+<pre><code>def hurst_exponent(returns, min_lag=10, max_lag=200):
+    """R/S Hurst estimate. Returns H in [0, 1]."""
+    lags = np.unique(np.logspace(np.log10(min_lag), np.log10(max_lag), 20).astype(int))
+    rs = []
+    for lag in lags:
+        chunks = [returns.iloc[i:i+lag].values for i in range(0, len(returns) - lag, lag)]
+        ratios = []
+        for c in chunks:
+            mean_c = c.mean()
+            cumdev = (c - mean_c).cumsum()
+            R = cumdev.max() - cumdev.min()
+            S = c.std(ddof=1)
+            if S > 0:
+                ratios.append(R / S)
+        rs.append(np.mean(ratios))
+    log_lags = np.log(lags)
+    log_rs = np.log(rs)
+    H, _ = np.polyfit(log_lags, log_rs, 1)
+    return float(H)</code></pre>
+
+<h3>Exercise C: Realised volatility from intraday data</h3>
+<p>If you have $m$ intraday observations per day, realised variance is the sum of squared intraday returns. This is unbiased and converges to integrated variance as $m \to \infty$.</p>
+<pre><code>def realised_variance(intraday_returns, m_per_day=78):
+    """Realised variance from m intraday log-returns per day."""
+    n_days = len(intraday_returns) // m_per_day
+    rv = np.zeros(n_days)
+    for d in range(n_days):
+        chunk = intraday_returns[d * m_per_day:(d+1) * m_per_day]
+        rv[d] = (chunk ** 2).sum()
+    return rv</code></pre>
+
+<h3>Exercise D: Implement the leverage effect EGARCH</h3>
+<p>EGARCH (Nelson 1991) lets the conditional variance respond asymmetrically to negative returns. Implement the simplest version and verify the leverage effect emerges in the simulated path.</p>
+<pre><code>def simulate_egarch(n, alpha=0.1, gamma=-0.15, beta=0.95, omega=-0.5, seed=0):
+    """log(sigma_t^2) = omega + alpha * |z_{t-1}| + gamma * z_{t-1} + beta * log(sigma_{t-1}^2)."""
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n)
+    log_var = np.zeros(n)
+    log_var[0] = omega / (1 - beta)
+    ret = np.zeros(n); ret[0] = np.exp(log_var[0] / 2) * z[0]
+    for t in range(1, n):
+        log_var[t] = omega + alpha * abs(z[t-1]) + gamma * z[t-1] + beta * log_var[t-1]
+        ret[t] = np.exp(log_var[t] / 2) * z[t]
+    return ret, np.exp(log_var / 2)</code></pre>
+
+<h3>Exercise E: Test for Gaussianity</h3>
+<p>Implement the Jarque-Bera test by hand. Statistic: $JB = (n/6)(\text{skew}^2 + (\text{excess\_kurt})^2 / 4)$. Under the null of normality, $JB \sim \chi^2_2$. Reject at 95% if $JB > 5.99$.</p>
+<pre><code>def jarque_bera(returns):
+    n = len(returns)
+    s = stats.skew(returns)
+    k = stats.kurtosis(returns, fisher=True)
+    jb = (n / 6) * (s ** 2 + k ** 2 / 4)
+    p_value = 1 - stats.chi2.cdf(jb, df=2)
+    return dict(jb=jb, p_value=p_value, reject_normal=jb > 5.99)</code></pre>
+
+<h2 id="s9">11. Self test</h2>
+
+<div class="selftest">
+  <h3>Question 1, conceptual</h3>
+  <p>If daily returns have skew $-0.5$ and excess kurtosis $5$, can you use $\mu \pm 2\sigma$ to bound 95% of the daily moves? Why or why not?</p>
+  <p><em>Hint:</em> the rule of thumb assumes normality. Negative skew means the left tail is heavier than the right. Heavy kurtosis means both tails extend further than the normal. Your "2 sigma" bound will undercover, especially on the down side.</p>
+</div>
+
+<div class="selftest">
+  <h3>Question 2, coding</h3>
+  <p>In Python, write a function <code>annualised_sharpe(returns, periods_per_year)</code>. Test it on the SPY profile in the heavy tails demo by reading values off the page. The Sharpe should be around 0.4 to 0.5 for SPY.</p>
+  <pre><code>def annualised_sharpe(returns, periods_per_year):
+    mean = returns.mean() * periods_per_year
+    vol = returns.std(ddof=1) * (periods_per_year ** 0.5)
+    return mean / vol</code></pre>
+</div>
+
+<div class="selftest">
+  <h3>Question 3, numerical</h3>
+  <p>Set the heavy tails demo to BTC and a sample size of 5000. Compute the ratio of empirical 3 sigma exceedances to the normal expected count (about 0.27% of n). Real BTC daily returns produce a ratio in the 3 to 6 range. Yours should too.</p>
+</div>
+
+<div class="nav">
+  <span>← Previous</span>
+  <span><a href="lesson_02_portfolio_variance.html">Next: Lesson 2, Portfolio Variance →</a></span>
+</div>
+
+<script>
+// Render math
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false}
+      ],
+      throwOnError: false
+    });
+  }
+});
+
+// ----- Utility math -----
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randn(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+// Student t draw via normal/chi-square
+function randt(rng, df) {
+  const z = randn(rng);
+  // chi-square sum of df squared standard normals
+  let chi = 0;
+  for (let i = 0; i < df; i++) {
+    const g = randn(rng);
+    chi += g * g;
+  }
+  return z / Math.sqrt(chi / df);
+}
+function mean(a) { let s = 0; for (const x of a) s += x; return s / a.length; }
+function variance(a) {
+  const m = mean(a); let s = 0;
+  for (const x of a) s += (x - m) * (x - m);
+  return s / (a.length - 1);
+}
+function std(a) { return Math.sqrt(variance(a)); }
+function skew(a) {
+  const m = mean(a), s = std(a); let s3 = 0;
+  for (const x of a) s3 += Math.pow((x - m) / s, 3);
+  return s3 / a.length;
+}
+function kurt(a) {
+  const m = mean(a), s = std(a); let s4 = 0;
+  for (const x of a) s4 += Math.pow((x - m) / s, 4);
+  return s4 / a.length - 3;
+}
+function corr(x, y) {
+  const mx = mean(x), my = mean(y);
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < x.length; i++) {
+    const a = x[i] - mx, b = y[i] - my;
+    num += a * b; dx += a * a; dy += b * b;
+  }
+  return num / Math.sqrt(dx * dy);
+}
+function normalPdf(x, mu, sigma) {
+  return Math.exp(-0.5 * Math.pow((x - mu) / sigma, 2)) / (sigma * Math.sqrt(2 * Math.PI));
+}
+// Approximate Student t pdf
+function studentPdf(x, df, mu, sigma) {
+  // standardise
+  const t = (x - mu) / sigma;
+  // log of normalising constant via Stirling-friendly identity:
+  const logNorm = lgamma((df + 1) / 2) - lgamma(df / 2) - 0.5 * Math.log(df * Math.PI);
+  const logKernel = -((df + 1) / 2) * Math.log(1 + t * t / df);
+  return Math.exp(logNorm + logKernel) / sigma;
+}
+function lgamma(x) {
+  // Lanczos approximation
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+  ];
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+  x -= 1;
+  let a = c[0];
+  const t = x + g + 0.5;
+  for (let i = 1; i < g + 2; i++) a += c[i] / (x + i);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+// Linspace
+function linspace(a, b, n) {
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = a + (b - a) * i / (n - 1);
+  return out;
+}
+
+// ===== Section 1: Simple vs Log =====
+function updateSection1() {
+  const p0 = parseFloat(document.getElementById('p0').value);
+  const p1 = parseFloat(document.getElementById('p1').value);
+  document.getElementById('p0_v').textContent = p0.toFixed(2);
+  document.getElementById('p1_v').textContent = p1.toFixed(2);
+  const rs = (p1 - p0) / p0;
+  const rl = Math.log(p1 / p0);
+  document.getElementById('r_simple').textContent = (rs * 100 >= 0 ? '+' : '') + (rs * 100).toFixed(4) + '%';
+  document.getElementById('r_log').textContent = (rl * 100 >= 0 ? '+' : '') + (rl * 100).toFixed(4) + '%';
+}
+['p0', 'p1'].forEach(id => document.getElementById(id).addEventListener('input', updateSection1));
+updateSection1();
+
+// ===== Section 2: Path with simple vs log =====
+function updateSection2() {
+  const muA = parseFloat(document.getElementById('mu').value);
+  const volA = parseFloat(document.getElementById('vol').value);
+  const n = parseInt(document.getElementById('n').value);
+  const seed = parseInt(document.getElementById('seed').value);
+  document.getElementById('mu_v').textContent = muA;
+  document.getElementById('vol_v').textContent = volA;
+  document.getElementById('n_v').textContent = n;
+  document.getElementById('seed_v').textContent = seed;
+
+  const muD = muA / 100 / 252;
+  const volD = volA / 100 / Math.sqrt(252);
+  const rng = mulberry32(seed);
+  const logRets = [];
+  const simpleRets = [];
+  let logSum = 0;
+  let prices = [100];
+  for (let t = 0; t < n; t++) {
+    const z = randn(rng);
+    const lr = muD + volD * z;
+    logRets.push(lr);
+    logSum += lr;
+    const newPrice = prices[prices.length - 1] * Math.exp(lr);
+    simpleRets.push(newPrice / prices[prices.length - 1] - 1);
+    prices.push(newPrice);
+  }
+  let simpleSum = 0;
+  for (const r of simpleRets) simpleSum += r;
+  const totalLog = Math.log(prices[prices.length - 1] / prices[0]);
+  const totalSimple = prices[prices.length - 1] / prices[0] - 1;
+
+  document.getElementById('sum_log').textContent = (logSum * 100).toFixed(4) + '%';
+  document.getElementById('sum_simple').textContent = (simpleSum * 100).toFixed(4) + '%';
+  document.getElementById('actual_log').textContent = (totalLog * 100).toFixed(4) + '%';
+  document.getElementById('actual_simple').textContent = (totalSimple * 100).toFixed(4) + '%';
+
+  Plotly.react('path_plot', [
+    { y: prices, type: 'scatter', mode: 'lines', name: 'Price', line: { color: '#2b6cb0' } }
+  ], {
+    margin: { l: 50, r: 30, t: 20, b: 40 },
+    yaxis: { title: 'Price' },
+    xaxis: { title: 'Day' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['mu', 'vol', 'n', 'seed'].forEach(id => document.getElementById(id).addEventListener('input', updateSection2));
+updateSection2();
+
+// ===== Section 4: Heavy tails =====
+const ASSET_DF = { spy: 5, agg: 8, btc: 3, gld: 6 };
+const ASSET_VOL = { spy: 0.15, agg: 0.05, btc: 0.80, gld: 0.18 };
+function updateSection4() {
+  const asset = document.getElementById('asset_pick').value;
+  // when user picks an asset, override df slider
+  const dfSlider = document.getElementById('df');
+  if (document.activeElement && document.activeElement.id === 'asset_pick') {
+    dfSlider.value = ASSET_DF[asset];
+  }
+  const df = parseInt(dfSlider.value);
+  const n = parseInt(document.getElementById('n2').value);
+  document.getElementById('df_v').textContent = df;
+  document.getElementById('n2_v').textContent = n;
+
+  const vol = ASSET_VOL[asset] / Math.sqrt(252);
+  const rng = mulberry32(123 + df * 31 + Math.round(vol * 10000));
+  const ts = new Array(n);
+  for (let i = 0; i < n; i++) {
+    ts[i] = vol * randt(rng, df);
+  }
+  const m = mean(ts), s = std(ts);
+  const sk = skew(ts), kt = kurt(ts);
+  let count3 = 0;
+  for (const r of ts) if (Math.abs(r - m) > 3 * s) count3++;
+
+  document.getElementById('emp_skew').textContent = sk.toFixed(3);
+  document.getElementById('emp_kurt').textContent = kt.toFixed(3);
+  document.getElementById('emp_3sig').textContent = count3;
+  document.getElementById('exp_3sig').textContent = (0.0027 * n).toFixed(1);
+
+  const minR = Math.min(...ts);
+  const maxR = Math.max(...ts);
+  const grid = linspace(minR, maxR, 200);
+  const npdf = grid.map(x => normalPdf(x, m, s));
+  const tpdf = grid.map(x => studentPdf(x, df, m, s * Math.sqrt((df - 2) / df)));
+
+  Plotly.react('hist_plot', [
+    { x: ts, type: 'histogram', histnorm: 'probability density', name: 'Empirical', marker: { color: '#2b6cb0', opacity: 0.55 }, nbinsx: 60 },
+    { x: grid, y: npdf, type: 'scatter', mode: 'lines', name: 'Normal fit', line: { color: '#c53030', width: 2.5 } },
+    { x: grid, y: tpdf, type: 'scatter', mode: 'lines', name: `Student t (df=${df})`, line: { color: '#22543d', width: 2.5 } }
+  ], {
+    margin: { l: 50, r: 30, t: 20, b: 40 },
+    xaxis: { title: 'Daily return' },
+    yaxis: { title: 'Density' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['asset_pick', 'df', 'n2'].forEach(id => document.getElementById(id).addEventListener('input', updateSection4));
+updateSection4();
+
+// ===== Section 5: ACF =====
+function autocorr(x, maxLag) {
+  const m = mean(x);
+  const v = variance(x) * (x.length - 1) / x.length;
+  const out = [1];
+  for (let h = 1; h <= maxLag; h++) {
+    let c = 0;
+    for (let t = h; t < x.length; t++) c += (x[t] - m) * (x[t - h] - m);
+    out.push(c / x.length / v);
+  }
+  return out;
+}
+function updateSection5() {
+  const beta = parseFloat(document.getElementById('beta').value);
+  const alphaA = parseFloat(document.getElementById('alpha').value);
+  const lags = parseInt(document.getElementById('lags').value);
+  document.getElementById('beta_v').textContent = beta.toFixed(2);
+  document.getElementById('alpha_v').textContent = alphaA.toFixed(2);
+  document.getElementById('lags_v').textContent = lags;
+
+  const n = 3000;
+  const rng = mulberry32(7);
+  const eps = new Array(n);
+  for (let i = 0; i < n; i++) eps[i] = randn(rng);
+  const ret = new Array(n);
+  const sig = new Array(n);
+  sig[0] = 0.01;
+  ret[0] = sig[0] * eps[0];
+  for (let t = 1; t < n; t++) {
+    sig[t] = Math.sqrt(0.0000001 + alphaA * ret[t-1] * ret[t-1] + beta * sig[t-1] * sig[t-1]);
+    ret[t] = sig[t] * eps[t];
+  }
+  const absR = ret.map(r => Math.abs(r));
+  const acf_r = autocorr(ret, lags);
+  const acf_a = autocorr(absR, lags);
+  const ci = 1.96 / Math.sqrt(n);
+
+  Plotly.react('acf_plot', [
+    { x: acf_r.map((_, i) => i), y: acf_r, type: 'bar', name: 'ACF of returns', marker: { color: '#2b6cb0' } },
+    { x: acf_a.map((_, i) => i), y: acf_a, type: 'bar', name: 'ACF of |returns|', marker: { color: '#c05621' }, xaxis: 'x2', yaxis: 'y2' }
+  ], {
+    grid: { rows: 1, columns: 2, pattern: 'independent' },
+    margin: { l: 50, r: 30, t: 30, b: 40 },
+    shapes: [
+      { type: 'line', xref: 'x', yref: 'y', x0: 0, x1: lags, y0: ci, y1: ci, line: { color: 'gray', dash: 'dash', width: 1 } },
+      { type: 'line', xref: 'x', yref: 'y', x0: 0, x1: lags, y0: -ci, y1: -ci, line: { color: 'gray', dash: 'dash', width: 1 } },
+      { type: 'line', xref: 'x2', yref: 'y2', x0: 0, x1: lags, y0: ci, y1: ci, line: { color: 'gray', dash: 'dash', width: 1 } },
+      { type: 'line', xref: 'x2', yref: 'y2', x0: 0, x1: lags, y0: -ci, y1: -ci, line: { color: 'gray', dash: 'dash', width: 1 } }
+    ],
+    xaxis: { title: 'Lag', domain: [0, 0.46] },
+    yaxis: { title: 'ACF returns', range: [-0.2, 0.5] },
+    xaxis2: { title: 'Lag', domain: [0.54, 1] },
+    yaxis2: { title: 'ACF |returns|', range: [-0.2, 0.5] },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['beta', 'alpha', 'lags'].forEach(id => document.getElementById(id).addEventListener('input', updateSection5));
+updateSection5();
+
+// ===== Section 6: leverage effect =====
+function updateSection6() {
+  const lev = parseFloat(document.getElementById('lev').value);
+  const n = parseInt(document.getElementById('lev_n').value);
+  document.getElementById('lev_v').textContent = lev.toFixed(2);
+  document.getElementById('lev_n_v').textContent = n;
+  const rng = mulberry32(99);
+  const r = new Array(n);
+  const sig = new Array(n);
+  sig[0] = 0.01;
+  r[0] = sig[0] * randn(rng);
+  for (let t = 1; t < n; t++) {
+    const negImpact = (r[t-1] < 0 ? 1 : 0);
+    const arch = (0.05 + Math.abs(lev) * negImpact) * r[t-1] * r[t-1];
+    sig[t] = Math.sqrt(0.0000001 + arch + 0.90 * sig[t-1] * sig[t-1]);
+    r[t] = sig[t] * randn(rng);
+  }
+  const sigNext = sig.slice(1);
+  const rPrev = r.slice(0, -1);
+  const c = corr(rPrev, sigNext);
+  // mean vol after a 5% down day (in our scale, that's 0.05)
+  let countDown = 0, sumVol = 0;
+  for (let t = 1; t < n; t++) {
+    if (r[t-1] < -0.02) { countDown++; sumVol += sig[t]; }
+  }
+  document.getElementById('lev_corr').textContent = c.toFixed(3);
+  document.getElementById('vol_after_down').textContent = countDown > 0 ? (sumVol / countDown * Math.sqrt(252) * 100).toFixed(1) + '% ann' : 'no events';
+
+  Plotly.react('lev_plot', [
+    { x: rPrev.map(x => x*100), y: sigNext.map(x => x*Math.sqrt(252)*100), type: 'scatter', mode: 'markers',
+      marker: { size: 4, color: '#2b6cb0', opacity: 0.5 } }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Return today (%)' },
+    yaxis: { title: 'Vol tomorrow (annualised %)' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+['lev', 'lev_n'].forEach(id => document.getElementById(id).addEventListener('input', updateSection6));
+updateSection6();
+
+// ===== Section 7: aggregational Gaussianity =====
+function updateSection7() {
+  const horizon = parseInt(document.getElementById('agg').value);
+  const srcDf = parseInt(document.getElementById('src_df').value);
+  document.getElementById('agg_v').textContent = horizon;
+  document.getElementById('src_df_v').textContent = srcDf;
+  const rng = mulberry32(2024);
+  const totalDays = 252 * 30; // 30 yrs of daily
+  const nWindows = Math.floor(totalDays / horizon);
+  const dailyVol = 0.012;
+  const aggReturns = new Array(nWindows);
+  for (let i = 0; i < nWindows; i++) {
+    let s = 0;
+    for (let j = 0; j < horizon; j++) s += dailyVol * randt(rng, srcDf);
+    aggReturns[i] = s;
+  }
+  const kt = kurt(aggReturns);
+  const effDf = kt > 0.05 ? Math.max(3, 6 / kt + 4) : 1000;
+  document.getElementById('agg_kurt').textContent = kt.toFixed(3);
+  document.getElementById('agg_df').textContent = effDf > 100 ? '>100' : effDf.toFixed(1);
+
+  const m = mean(aggReturns), s = std(aggReturns);
+  const grid = linspace(Math.min(...aggReturns), Math.max(...aggReturns), 200);
+  const npdf = grid.map(x => normalPdf(x, m, s));
+
+  Plotly.react('agg_plot', [
+    { x: aggReturns, type: 'histogram', histnorm: 'probability density', name: `${horizon}-day returns`, marker: { color: '#2b6cb0', opacity: 0.55 }, nbinsx: 50 },
+    { x: grid, y: npdf, type: 'scatter', mode: 'lines', name: 'Normal fit', line: { color: '#c53030', width: 2.5 } }
+  ], {
+    margin: { l: 50, r: 30, t: 20, b: 40 },
+    xaxis: { title: `${horizon}-day return` },
+    yaxis: { title: 'Density' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['agg', 'src_df'].forEach(id => document.getElementById(id).addEventListener('input', updateSection7));
+updateSection7();
+</script>
+
+</body>
+</html>
