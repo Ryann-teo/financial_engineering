@@ -138,6 +138,60 @@
   <strong>In practice (Macrosynergy art 3, the flagship):</strong> "Unlocking relative value across asset classes" delivers Sharpe 1.8, Sortino 2.7, correlation to S&amp;P 500 of 10 to 20%, top 5% of months contribute 35 to 40% of PnL. The strategy uses the same architecture as this capstone: macro scorecard signals (themes), equal weighting within and across themes, vol targeting per asset, drawdown control. The capstone demo here approximates the flagship pattern. Full implementation requires the JPMaQS dataset and the open-source `macrosynergy` package; see article 39.
 </div>
 
+<h2 id="s_attr">6b. Deep dive: performance attribution by signal family</h2>
+
+<p>Once the capstone runs, the next question is always: where did the PnL come from? Performance attribution decomposes total return into contributions from each signal family (trend, carry, value, growth, inflation), each asset class, and the risk overlay (vol target, drawdown control).</p>
+
+<h3>Per-signal-family attribution</h3>
+<p>For each signal $k$, compute the portfolio return that would have resulted if only signal $k$ had been used (with the same risk overlay). The total composite return is approximately the sum of per-signal contributions, with cross-terms captured in an "interaction" residual.</p>
+
+<h3>Typical decomposition for the MS flagship</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Signal family</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Standalone Sharpe</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Contribution to composite</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Correlation with rest</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Trend</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.6 to 0.9</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">25 to 30%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">low</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Carry</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 to 0.8</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20 to 25%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">low</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Value</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.3 to 0.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 15%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">slight neg vs trend</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Growth</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.4 to 0.7</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">15 to 20%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">moderate</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Inflation</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.4 to 0.6</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">15%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">moderate</td></tr>
+  </tbody>
+</table>
+
+<h3>Live: per-family attribution chart</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Trend signal IC: <span class="value" id="ic_t_v">0.10</span></label>
+      <input type="range" id="ic_t" min="0" max="0.20" step="0.01" value="0.10">
+    </div>
+    <div class="control">
+      <label>Carry signal IC: <span class="value" id="ic_c_v">0.08</span></label>
+      <input type="range" id="ic_c" min="0" max="0.20" step="0.01" value="0.08">
+    </div>
+    <div class="control">
+      <label>Value signal IC: <span class="value" id="ic_v_v">0.05</span></label>
+      <input type="range" id="ic_v" min="0" max="0.20" step="0.01" value="0.05">
+    </div>
+    <div class="control">
+      <label>Growth signal IC: <span class="value" id="ic_g_v">0.07</span></label>
+      <input type="range" id="ic_g" min="0" max="0.20" step="0.01" value="0.07">
+    </div>
+  </div>
+  <div id="attr_plot" class="plot" style="height: 360px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Composite Sharpe</span><span class="stat-value" id="comp_sr">0</span></div>
+    <div class="stat"><span>Top contributor</span><span class="stat-value" id="top_contrib">0</span></div>
+    <div class="stat"><span>Diversification benefit</span><span class="stat-value" id="div_benefit">0</span></div>
+  </div>
+</div>
+
 <h2 id="s_code">7. Coding exercises (extras)</h2>
 
 <h3>Exercise A: Build the capstone in code</h3>
@@ -295,6 +349,51 @@ function update29() {
 }
 ['vt', 'dd', 'cost', 'ic'].forEach(id => document.getElementById(id).addEventListener('input', update29));
 update29();
+
+function updateAttribution() {
+  const ic_t = Number(document.getElementById('ic_t').value);
+  const ic_c = Number(document.getElementById('ic_c').value);
+  const ic_v = Number(document.getElementById('ic_v').value);
+  const ic_g = Number(document.getElementById('ic_g').value);
+  document.getElementById('ic_t_v').textContent = ic_t.toFixed(2);
+  document.getElementById('ic_c_v').textContent = ic_c.toFixed(2);
+  document.getElementById('ic_v_v').textContent = ic_v.toFixed(2);
+  document.getElementById('ic_g_v').textContent = ic_g.toFixed(2);
+
+  const N = 25, freq = 12;
+  const breadth = N * freq;
+  const ics = [ic_t, ic_c, ic_v, ic_g, 0.06]; // last is inflation, fixed
+  const families = ['Trend', 'Carry', 'Value', 'Growth', 'Inflation'];
+  const sharpes = ics.map(ic => ic * Math.sqrt(breadth));
+  // Composite assumes equal weight, average correlation 0.2 across families
+  const rho = 0.2;
+  const K = 5;
+  const compIC = ics.reduce((a, b) => a + b, 0) / K * Math.sqrt(K) / Math.sqrt(1 + (K - 1) * rho);
+  const compSR = compIC * Math.sqrt(breadth);
+  // Per-family contribution share = sharpe^2 / sum(sharpe^2) approx (under independence)
+  const sr2 = sharpes.map(s => s * s);
+  const sumSr2 = sr2.reduce((a, b) => a + b, 0);
+  const shares = sr2.map(x => x / Math.max(sumSr2, 1e-12) * 100);
+
+  const topIdx = shares.indexOf(Math.max(...shares));
+  const divBenefit = compSR / Math.max(...sharpes);
+
+  document.getElementById('comp_sr').textContent = compSR.toFixed(2);
+  document.getElementById('top_contrib').textContent = families[topIdx] + ' (' + shares[topIdx].toFixed(0) + '%)';
+  document.getElementById('div_benefit').textContent = divBenefit.toFixed(2) + 'x';
+
+  Plotly.react('attr_plot', [
+    { x: families, y: sharpes, type: 'bar', name: 'Standalone Sharpe', marker: { color: '#cbd5e0' } },
+    { x: families, y: shares.map(s => s / 100 * compSR), type: 'bar', name: 'Contribution to composite', marker: { color: '#2b6cb0' } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Sharpe units' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['ic_t', 'ic_c', 'ic_v', 'ic_g'].forEach(id => document.getElementById(id).addEventListener('input', updateAttribution));
+updateAttribution();
 </script>
 </body>
 </html>

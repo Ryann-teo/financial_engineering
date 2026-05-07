@@ -94,6 +94,7 @@
     <li><a href="#s6">Stylised fact three: the leverage effect</a></li>
     <li><a href="#s7">Stylised fact four: aggregational Gaussianity</a></li>
     <li><a href="#s8">Stylised fact five: zero linear autocorrelation</a></li>
+    <li><a href="#s_pyshell">Python sandbox: 10 fill-in-the-blank exercises</a></li>
     <li><a href="#s9">Self test</a></li>
   </ol>
 </div>
@@ -593,7 +594,270 @@ df_t, mu_t, sigma_t = stats.t.fit(returns)</code></pre>
     p_value = 1 - stats.chi2.cdf(jb, df=2)
     return dict(jb=jb, p_value=p_value, reject_normal=jb > 5.99)</code></pre>
 
-<h2 id="s9">11. Self test</h2>
+<h2 id="s_pyshell">11. Python sandbox: do the exercises right here</h2>
+
+<p>Below is a real Python interpreter running in your browser via <a href="https://pyodide.org">Pyodide</a> (CPython compiled to WebAssembly). numpy, pandas, scipy, and statsmodels are pre-installed. Edit the code, click Run, and the assertion tells you if your implementation is correct.</p>
+
+<p><strong>First load takes 30 to 60 seconds</strong> while Python and the scientific stack download (~80 MB total). Subsequent runs are instant. Status indicator below.</p>
+
+<div id="pyodide-status" style="background: #fffbea; border-left: 4px solid #f59e0b; padding: 0.6rem 1rem; margin: 1rem 0; font-family: monospace; font-size: 0.9rem;">Status: Loading Python runtime...</div>
+
+<div class="demo" style="background: #1a202c; color: #e2e8f0;">
+  <p style="color: #cbd5e0; margin-bottom: 0.5rem;"><strong style="color: white;">Setup cell (auto-runs after Python loads).</strong> Defines synthetic SPY, AGG, GLD, BTC return series for the exercises.</p>
+  <pre id="setup-code" style="font-size: 0.78em; max-height: 250px; overflow-y: auto;">import numpy as np
+import pandas as pd
+from scipy import stats
+
+np.random.seed(2026)
+ASSET_PARAMS = {
+    'SPY': dict(mu=0.08, vol=0.15, df=5, leverage=-0.4),
+    'AGG': dict(mu=0.04, vol=0.05, df=8, leverage=-0.1),
+    'GLD': dict(mu=0.06, vol=0.18, df=6, leverage=0.0),
+    'BTC': dict(mu=0.30, vol=0.80, df=3, leverage=-0.2),
+}
+
+def generate_prices(asset_name, n_years=15, seed=None):
+    rng = np.random.default_rng(seed if seed is not None else abs(hash(asset_name)) % (2**31))
+    p = ASSET_PARAMS[asset_name]
+    n = int(n_years * 252)
+    eps = rng.standard_t(p['df'], n)
+    eps = eps / np.std(eps)
+    daily_vol = p['vol'] / np.sqrt(252)
+    daily_mu = p['mu'] / 252
+    vol = np.zeros(n); vol[0] = daily_vol
+    ret = np.zeros(n); ret[0] = daily_mu + vol[0] * eps[0]
+    for t in range(1, n):
+        shock = vol[t-1] * eps[t-1]
+        asym = 1.0 + p['leverage'] * (1 if shock &lt; 0 else 0)
+        vol[t] = np.sqrt(1e-7 + 0.05 * (shock * asym)**2 + 0.93 * vol[t-1]**2)
+        ret[t] = daily_mu + vol[t] * eps[t]
+    prices = 100 * np.exp(np.cumsum(ret))
+    idx = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=n)
+    return pd.Series(prices, index=idx, name=asset_name)
+
+prices_dict = {name: generate_prices(name, n_years=15) for name in ASSET_PARAMS}
+returns_dict = {name: np.log(p / p.shift(1)).dropna() for name, p in prices_dict.items()}
+print('Setup complete. Available: prices_dict, returns_dict for SPY, AGG, GLD, BTC')</pre>
+</div>
+
+<style>
+  .py-exercise { background: #f7fafc; border: 1px solid #e2e8f0; border-left: 4px solid #2b6cb0; border-radius: 6px; padding: 1rem 1.4rem; margin: 1rem 0; }
+  .py-exercise h3 { color: #2b6cb0; margin-top: 0; }
+  .py-exercise textarea { width: 100%; min-height: 140px; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 0.85em; background: #1a202c; color: #e2e8f0; border: none; border-radius: 4px; padding: 0.8rem; resize: vertical; tab-size: 4; }
+  .py-exercise .py-controls { margin-top: 0.6rem; display: flex; gap: 0.6rem; align-items: center; }
+  .py-exercise button { background: #2b6cb0; color: white; border: none; padding: 0.4rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.9em; }
+  .py-exercise button:hover { background: #1e4d80; }
+  .py-exercise button:disabled { background: #cbd5e0; cursor: not-allowed; }
+  .py-output { background: #2d3748; color: #e2e8f0; padding: 0.6rem 1rem; border-radius: 4px; margin-top: 0.6rem; font-family: monospace; font-size: 0.85em; min-height: 1.5em; white-space: pre-wrap; }
+  .py-output.pass { border-left: 4px solid #38a169; }
+  .py-output.fail { border-left: 4px solid #c53030; }
+</style>
+
+<div class="py-exercise">
+  <h3>Exercise 1.1: Simple and log returns</h3>
+  <p>Implement <code>simple_returns</code> and <code>log_returns</code>. Drop the first NaN.</p>
+  <textarea id="code-1">def simple_returns(prices):
+    return ___
+
+def log_returns(prices):
+    return ___
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(1)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-1"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.2: Aggregation property of log returns</h3>
+  <p>Verify that the sum of daily log returns equals $\ln(P_n / P_0)$, but simple returns do not aggregate.</p>
+  <textarea id="code-2">p = prices_dict['SPY']
+rl = log_returns(p)
+rs = simple_returns(p)
+
+total_log_return = ___      # ln(P_last / P_first)
+sum_of_log_returns = ___    # rl.sum()
+total_simple_return = ___   # P_last / P_first - 1
+sum_of_simple_returns = ___ # rs.sum()
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(2)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-2"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.3: Annualisation</h3>
+  <p>Compute annualised mean, vol, and Sharpe from daily log returns. Use 252 trading days per year.</p>
+  <textarea id="code-3">def annualised_stats(daily_log_returns, periods_per_year=252):
+    mean_ann = ___
+    vol_ann = ___
+    sharpe = ___
+    return dict(mean=mean_ann, vol=vol_ann, sharpe=sharpe)
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(3)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-3"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.4: Skewness and excess kurtosis</h3>
+  <p>Use <code>scipy.stats.skew</code> and <code>scipy.stats.kurtosis(r, fisher=True)</code>.</p>
+  <textarea id="code-4">def higher_moments(returns):
+    skew = ___
+    excess_kurt = ___
+    return dict(skew=skew, excess_kurt=excess_kurt)
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(4)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-4"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.5: Fit a Student t and recover df</h3>
+  <p>Use <code>scipy.stats.t.fit</code>. SPY synthetic data was generated with df=5, so the recovered df should be in the 4 to 7 range.</p>
+  <textarea id="code-5">def fit_student_t(returns):
+    df, loc, scale = ___
+    return dict(df=df, loc=loc, scale=scale)
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(5)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-5"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.6: Compare normal vs t VaR estimates</h3>
+  <p>Compute 99% one-day VaR under fitted normal and fitted Student t. Compare to empirical.</p>
+  <textarea id="code-6">def var_estimates(returns, alpha=0.99):
+    losses = -returns.values
+    var_empirical = ___  # np.quantile of losses at alpha
+
+    mu_n, sd_n = losses.mean(), losses.std(ddof=1)
+    var_normal = ___  # mu_n + sd_n * stats.norm.ppf(alpha)
+
+    df_t, loc_t, scale_t = stats.t.fit(losses)
+    var_t = ___       # loc_t + scale_t * stats.t.ppf(alpha, df_t)
+
+    return dict(empirical=var_empirical, normal=var_normal, t=var_t)
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(6)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-6"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.7: Autocorrelation function</h3>
+  <p>Compute the lag-1, lag-5, lag-22 autocorrelation of returns and absolute returns.</p>
+  <textarea id="code-7">def acf_at_lags(returns, lags=(1, 5, 22)):
+    abs_returns = ___  # take absolute value
+    acf_r = {h: ___ for h in lags}        # autocorrelation of returns at lag h
+    acf_abs = {h: ___ for h in lags}      # autocorrelation of |returns| at lag h
+    return dict(returns=acf_r, abs_returns=acf_abs)
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(7)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-7"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.8: Ljung-Box test for autocorrelation</h3>
+  <p>Use <code>statsmodels.stats.diagnostic.acorr_ljungbox</code> with <code>lags=[10]</code>.</p>
+  <textarea id="code-8">from statsmodels.stats.diagnostic import acorr_ljungbox
+
+def ljung_box_diagnostic(returns, lag=10):
+    lb_returns = ___       # acorr_ljungbox on returns, lags=[lag]
+    lb_squared = ___       # acorr_ljungbox on returns**2, lags=[lag]
+    return dict(
+        p_returns=float(lb_returns['lb_pvalue'].iloc[0]),
+        p_squared=float(lb_squared['lb_pvalue'].iloc[0]),
+    )
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(8)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-8"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.9: Implement a GARCH(1,1) simulator</h3>
+  <p>$\sigma_t^2 = \omega + \alpha r_{t-1}^2 + \beta \sigma_{t-1}^2$.</p>
+  <textarea id="code-9">def simulate_garch(n, omega, alpha, beta, seed=0):
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n)
+    vol = np.zeros(n)
+    ret = np.zeros(n)
+    long_run_vol = ___  # sqrt(omega / (1 - alpha - beta))
+    vol[0] = long_run_vol
+    ret[0] = vol[0] * z[0]
+    for t in range(1, n):
+        vol[t] = ___  # sqrt(omega + alpha * ret[t-1]**2 + beta * vol[t-1]**2)
+        ret[t] = ___  # vol[t] * z[t]
+    return ret, vol
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(9)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-9"></div>
+</div>
+
+<div class="py-exercise">
+  <h3>Exercise 1.10: The leverage effect</h3>
+  <p>Compute the empirical correlation between today's return and tomorrow's realised vol. SPY should be negative.</p>
+  <textarea id="code-10">def leverage_effect(returns, vol_window=22):
+    rolling_vol = ___  # rolling std with window=vol_window
+    r_today = returns.iloc[:-1].values
+    vol_tomorrow = rolling_vol.shift(-1).iloc[:-1].values
+    mask = ~np.isnan(r_today) &amp; ~np.isnan(vol_tomorrow)
+    return float(___)  # correlation between r_today[mask] and vol_tomorrow[mask]
+</textarea>
+  <div class="py-controls"><button onclick="runExercise(10)" disabled class="run-btn">Run</button></div>
+  <div class="py-output" id="output-10"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+<script>
+let pyodide = null;
+const setupCode = document.getElementById('setup-code').textContent;
+
+const tests = {
+  1: "rs = simple_returns(prices_dict['SPY'])\nrl = log_returns(prices_dict['SPY'])\np = prices_dict['SPY']\nassert len(rs) == len(p) - 1, f'Wrong length: expected {len(p)-1}, got {len(rs)}'\nassert abs(float(rs.iloc[0]) - (p.iloc[1]/p.iloc[0] - 1)) < 1e-9, 'simple_returns is wrong'\nassert abs(float(rl.iloc[0]) - np.log(p.iloc[1]/p.iloc[0])) < 1e-9, 'log_returns is wrong'\n'PASSED. simple_returns and log_returns both work.'",
+  2: "expected = abs(total_log_return - sum_of_log_returns) < 1e-8\nassert expected, f'log returns must aggregate exactly: {total_log_return} vs {sum_of_log_returns}'\ndiff = abs(total_simple_return - sum_of_simple_returns)\nassert diff > 0.001, f'simple returns should NOT aggregate to total: diff={diff}'\nf'PASSED. log sum = total = {sum_of_log_returns:.4f}; simple diff = {diff:.4f}.'",
+  3: "rl = log_returns(prices_dict['SPY'])\nout = annualised_stats(rl)\nassert 0.04 < out['mean'] < 0.12, f\"SPY mean should be ~8%; got {out['mean']:.3f}\"\nassert 0.10 < out['vol'] < 0.20, f\"SPY vol should be ~15%; got {out['vol']:.3f}\"\nf\"PASSED. mean={out['mean']:.3%}, vol={out['vol']:.3%}, Sharpe={out['sharpe']:.2f}\"",
+  4: "btc_kurt = higher_moments(returns_dict['BTC'])['excess_kurt']\nagg_kurt = higher_moments(returns_dict['AGG'])['excess_kurt']\nassert btc_kurt > agg_kurt, f'BTC ({btc_kurt:.2f}) should have heavier tails than AGG ({agg_kurt:.2f})'\nm = higher_moments(returns_dict['SPY'])\nf\"PASSED. SPY skew={m['skew']:+.3f}, excess kurt={m['excess_kurt']:+.3f}; BTC excess kurt={btc_kurt:.2f}\"",
+  5: "spy_df = fit_student_t(returns_dict['SPY'])['df']\nbtc_df = fit_student_t(returns_dict['BTC'])['df']\nassert btc_df < spy_df, f'BTC df ({btc_df:.2f}) should be lower than SPY ({spy_df:.2f})'\nf\"PASSED. SPY df={spy_df:.2f}, BTC df={btc_df:.2f}. Lower df = heavier tails.\"",
+  6: "v = var_estimates(returns_dict['BTC'], 0.99)\nassert v['empirical'] > 0, 'VaR should be positive (it is a loss)'\nassert v['t'] > v['normal'] * 0.5, f\"t-fit VaR ({v['t']:.4f}) shouldn't be tiny vs normal ({v['normal']:.4f})\"\nf\"PASSED. BTC empirical VaR={v['empirical']:.2%}, normal={v['normal']:.2%}, t={v['t']:.2%}\"",
+  7: "out = acf_at_lags(returns_dict['SPY'])\nassert out['abs_returns'][1] > out['returns'][1], 'volatility clustering: |r| ACF > r ACF at lag 1'\nassert out['abs_returns'][5] > 0.05, f\"SPY |r| should show clustering at lag 5; got {out['abs_returns'][5]:.3f}\"\nf\"PASSED. r ACF at lag 1: {out['returns'][1]:+.3f}; |r| ACF at lag 1: {out['abs_returns'][1]:+.3f}\"",
+  8: "out = ljung_box_diagnostic(returns_dict['SPY'], lag=10)\nassert out['p_squared'] < 0.01, f\"squared returns should reject white noise; p={out['p_squared']:.4f}\"\nf\"PASSED. Returns p-value={out['p_returns']:.4f}, squared returns p-value={out['p_squared']:.6f}\"",
+  9: "ret, vol = simulate_garch(n=2520, omega=1e-6, alpha=0.05, beta=0.93, seed=42)\nassert len(ret) == 2520, 'wrong length'\nabs_ret_acf = pd.Series(np.abs(ret)).autocorr(1)\nassert abs_ret_acf > 0.10, f'GARCH should produce clustering; got |r| ACF = {abs_ret_acf:.3f}'\nf\"PASSED. Realised |r| ACF at lag 1: {abs_ret_acf:.3f}. Clustering confirmed.\"",
+  10: "spy_lev = leverage_effect(returns_dict['SPY'])\nassert spy_lev < 0, f'SPY leverage effect should be negative; got {spy_lev:+.3f}'\nf\"PASSED. SPY return-vs-next-vol correlation: {spy_lev:+.3f} (negative = leverage effect confirmed)\"",
+};
+
+async function initPyodide() {
+  try {
+    pyodide = await loadPyodide();
+    document.getElementById('pyodide-status').textContent = 'Status: Loading numpy, pandas, scipy, statsmodels...';
+    await pyodide.loadPackage(['numpy', 'pandas', 'scipy', 'statsmodels']);
+    document.getElementById('pyodide-status').textContent = 'Status: Running setup cell...';
+    await pyodide.runPythonAsync(setupCode);
+    document.getElementById('pyodide-status').innerHTML = '<span style="color: #22543d; font-weight: 700;">Status: Python ready.</span> Edit any exercise cell, click Run.';
+    document.querySelectorAll('.run-btn').forEach(b => b.disabled = false);
+  } catch (err) {
+    document.getElementById('pyodide-status').innerHTML = '<span style="color: #c53030;">Status: Failed to load Python. Check console.</span>';
+    console.error(err);
+  }
+}
+initPyodide();
+
+async function runExercise(n) {
+  const code = document.getElementById('code-' + n).value;
+  const out = document.getElementById('output-' + n);
+  out.className = 'py-output';
+  out.textContent = 'Running...';
+  if (!pyodide) { out.textContent = 'Python not loaded yet, please wait.'; return; }
+  try {
+    pyodide.runPython("import io, sys\n_out_buf = io.StringIO()\nsys.stdout = _out_buf");
+    await pyodide.runPythonAsync(code);
+    const result = await pyodide.runPythonAsync(tests[n]);
+    pyodide.runPython('sys.stdout = sys.__stdout__');
+    const stdout = pyodide.runPython('_out_buf.getvalue()');
+    out.className = 'py-output pass';
+    out.textContent = (stdout ? stdout + '\n' : '') + (typeof result === 'string' ? result : String(result));
+  } catch (err) {
+    pyodide.runPython('sys.stdout = sys.__stdout__');
+    out.className = 'py-output fail';
+    out.textContent = 'FAILED: ' + err.message;
+  }
+}
+</script>
+
+<h2 id="s9">12. Self test</h2>
 
 <div class="selftest">
   <h3>Question 1, conceptual</h3>

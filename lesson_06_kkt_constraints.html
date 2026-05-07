@@ -144,6 +144,28 @@ $$\lambda_i^\star g_i(x^\star) = 0 \quad \text{(complementary slackness)}$$</div
   <strong>In practice (Macrosynergy):</strong> MS strategies are typically built signal-by-signal with simple constraints (vol target, signal cap at $\pm 2$ SD, sigmoid sizing). They almost never run a full constrained QP because the input vector $\mu$ is too noisy to justify the complexity. The rare exceptions: when implementing for a regulated entity with mandate constraints (sector caps, ESG tilts, country limits), they wrap the existing signal weights with a tracking-error-minimising overlay. Lesson 25 covers this pattern.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: reading dual values in production</h2>
+
+<p>The Lagrange multiplier on each constraint is not just a mathematical artifact. It has a precise economic meaning: <strong>shadow price</strong>, the marginal value of relaxing the constraint by one unit.</p>
+
+<h3>Worked example: a 50-stock long-only fund</h3>
+<p>Constraints: long only ($w_i \ge 0$), max position 5%, sector cap 25% (10 sectors), beta neutral. The optimiser returns weights and a vector of dual values, one per constraint. Read them.</p>
+<ul>
+  <li><strong>Long-only multipliers ($\lambda_i^{LO}$):</strong> non-zero for assets where the unconstrained optimum is short. Each $\lambda_i^{LO}$ tells you how much utility you would gain per unit of additional shortability of asset $i$. If $\lambda_i^{LO} = 0.005$, allowing 5% short on that name would add 2.5 bp of utility.</li>
+  <li><strong>Max position multipliers ($\lambda_i^{\max}$):</strong> non-zero where the cap binds. If $\lambda_i^{\max} = 0.012$, allowing 1% more allocation to that name would add 12 bp of utility. These are your "cant get enough of this" names.</li>
+  <li><strong>Sector multipliers:</strong> non-zero where sector caps bind. Tells you which sectors are over-attractive vs the cap.</li>
+  <li><strong>Beta-neutrality multiplier:</strong> usually small but non-zero. Quantifies the cost of staying market-neutral.</li>
+</ul>
+
+<h3>Aggregate constraint cost</h3>
+<p>Sum of dual values times constraint slack = total utility loss from constraints. This is the "price of compliance" for a regulated mandate. Risk teams report this in basis points to their PMs and clients.</p>
+
+<h3>Sensitivity analysis</h3>
+<p>For each binding constraint, ask: would the PM benefit from relaxing it? If the dual value is large (high shadow price) and the constraint is "soft" (e.g. an internal risk limit rather than a regulatory rule), it might be worth raising the limit. If the dual value is small, the constraint costs nothing and can be tightened for additional safety margin.</p>
+
+<h3>The "constraint binding map" diagnostic</h3>
+<p>In production, after every optimisation, log the active constraints and their dual values. Trends over time tell you whether your alpha is getting boxed in by the same constraints repeatedly (a sign you should rethink the mandate) or whether constraints are rotating (which is healthy).</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 Why long-only constraints make the problem strictly harder</h3>

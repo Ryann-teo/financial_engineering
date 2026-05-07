@@ -123,6 +123,46 @@
   <strong>In practice (Macrosynergy art 3):</strong> The flagship cross-asset relative-value strategy (art 3) is built on equal-weighted scorecards. The empirical result: it has DR around 2.5 and ENB around 5 across 50+ instruments. MS does not run MDP because the optimised correlation structure is not stable enough. Instead they get diversification by combining many uncorrelated signals (theoretical priors), which maps each signal to roughly equal risk regardless of estimated correlations.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: when do allocations agree and when do they diverge?</h2>
+
+<p>Equal weight, ERC, MDP, and minimum variance can all give similar weights or wildly different ones depending on the universe. Understanding the regimes makes you a smarter allocator.</p>
+
+<h3>Special cases where they coincide</h3>
+<ul>
+  <li><strong>Identical vols, identical correlations.</strong> All four = $1/N$. Symmetry forces uniform weights.</li>
+  <li><strong>Identical correlations, heterogeneous vols.</strong> ERC = MDP = inverse-vol weights. Min-var heavily overweights the lowest-vol asset; equal weight ignores the differences.</li>
+  <li><strong>Diagonal $\Sigma$ (uncorrelated assets), equal vol.</strong> All four = $1/N$.</li>
+</ul>
+
+<h3>Cases where they diverge dramatically</h3>
+<ul>
+  <li><strong>One very low-vol asset (bonds at 5%) + several high-vol assets.</strong> Min-var puts 60 to 80% in the bond. ERC puts ~25 to 35%. MDP somewhere in between. Equal weight ignores it.</li>
+  <li><strong>Cluster structure (3 cluster of correlated assets).</strong> Min-var concentrates in low-correlation orphans. ERC spreads roughly equally. MDP picks within-cluster diversifiers.</li>
+  <li><strong>One asset with negative correlation to the rest.</strong> Min-var massively overweights it (sometimes >100%). ERC and MDP modestly overweight.</li>
+</ul>
+
+<h3>The diversification ratio across allocations</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Allocation</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">DR (low correlation)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">DR (high correlation)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">ENB (low)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">ENB (high)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Equal weight</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.0 to 2.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.1 to 1.3</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5.0</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5 to 2.0</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Inverse vol</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.2 to 2.7</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.2 to 1.4</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3 to 5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5 to 2.5</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">ERC</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.4 to 2.8</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.2 to 1.4</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5.0 (by construction)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5.0</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">MDP</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.5 to 3.0 (max)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.2 to 1.4</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3 to 4</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5 to 2.5</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Min-var</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5 to 2.0</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.1 to 1.2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2 to 3</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.0 to 1.5</td></tr>
+  </tbody>
+</table>
+
+<p>Read: ERC has effective N exactly equal to N by construction (each asset contributes equally to risk). MDP maximises DR. Min-var concentrates risk in a few directions. Equal weight is "robust default" without explicitly maximising any metric.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 MDP closed-form via the tangency analogy</h3>
 <p>Treat each asset as having $\hat \mu_i = \sigma_i$. Then the tangency portfolio formula gives</p>

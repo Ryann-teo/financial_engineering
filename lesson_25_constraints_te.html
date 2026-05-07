@@ -141,6 +141,41 @@
   <strong>In practice (Macrosynergy art 15):</strong> Article 15 ("A macro-quantamental scorecard for global equities") is the closest MS analog to a mandate-constrained product: country-level scorecards used to tilt a global equity benchmark. The TE budget is implicit (vol-targeted at the active position level). MS does not optimise the active weights with a constrained QP; they apply the scorecard as a tilt and let the magnitude come from the macro signal strength. This is "constraint-by-construction" rather than "constraint-via-optimisation".
 </div>
 
+<h2 id="s_deep">5b. Deep dive: the transfer coefficient (TC) by mandate type</h2>
+
+<p>Grinold and Kahn's fundamental law: $\text{IR} = \text{IC} \cdot \sqrt{\text{breadth}} \cdot \text{TC}$. The transfer coefficient TC is what fraction of your alpha you can actually translate into active weights given mandate constraints.</p>
+
+<h3>TC ranges by mandate</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Mandate</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Typical TC</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Why</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Long-short hedge fund (no mandate)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.85 to 0.95</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Can express both long and short alpha. Small slippage from leverage limits.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Active long-only (TE 5%)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50 to 0.65</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Cannot short. Underweights capped by benchmark weight.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Long-only with sector neutrality</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.40 to 0.55</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Sector-relative bets only.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Long-only with country and sector neutrality</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.30 to 0.45</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Multiple neutrality constraints stack.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">130/30 (limited shorting)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.65 to 0.80</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Significant TC recovery from limited shorting.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Index fund (TE &lt; 0.5%)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.05 to 0.15</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">By design, almost no active alpha expressed.</td></tr>
+  </tbody>
+</table>
+
+<h3>Worked example: how mandate eats alpha</h3>
+<p>Take a manager with IC = 0.06 across 100 stocks rebalancing monthly. Breadth = 100 * 12 = 1200 per year. Unconstrained IR = 0.06 * sqrt(1200) ~ 2.08. </p>
+<p>With long-only constraint (TC = 0.5): IR = 1.04.</p>
+<p>With long-only + sector neutrality (TC = 0.4): IR = 0.83.</p>
+<p>With ESG carbon cap added (TC = 0.35): IR = 0.73.</p>
+<p>With turnover cap of 100% per year (TC = 0.30): IR = 0.62.</p>
+
+<p>The same alpha generation produces wildly different outcomes depending on mandate. Boutique hedge funds have higher fees because their unconstrained TC lets them deliver IR &gt; 1. Constrained mutual funds with similar IC can only deliver IR &lt; 0.5 even with the same skill.</p>
+
+<h3>The "first constraint costs the most" rule</h3>
+<p>Long-only is the most expensive single constraint, costing 30 to 50% of TC. After that, additional constraints cost progressively less because they overlap with what long-only already cuts. So the first thing to relax (if you can) is long-only.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Active mean-variance closed form</h3>
 <p>Without TE budget, the active-MV solution is $a^\star \propto \Sigma^{-1} \alpha - (\mathbf{1}^\top \Sigma^{-1} \alpha / \mathbf{1}^\top \Sigma^{-1} \mathbf{1}) \Sigma^{-1} \mathbf{1}$. The second term enforces $\sum a = 0$. With a TE budget, scale the unconstrained solution to hit the budget: $a = c a^{\text{unc}}$ where $c = \text{TE}^\star / \sqrt{a^{\text{unc}\top} \Sigma a^{\text{unc}}}$.</p>

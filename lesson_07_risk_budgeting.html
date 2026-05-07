@@ -144,6 +144,42 @@
   <strong>In practice (Macrosynergy art 23, 88):</strong> Macro-aware risk parity. Take ERC weights as the baseline and tilt them with a macro signal (e.g. growth, inflation regime) to capture cyclical opportunities. Article 23 demonstrates this on cross-asset data with Sharpe 1.3 (vs 0.8 for plain risk parity). Article 88 generalises with a multi-factor macro overlay. The key insight: ERC gives you a stable risk-balanced portfolio; the macro tilt adds the alpha. This is a deliberate "two-fund" structure where one fund is the risk-balanced book and the other is the macro overlay.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: the 60/40 risk illusion</h2>
+
+<p>The most common asset allocation in the world is "60/40" - 60% equities, 40% bonds. Investors think of it as a balanced portfolio. In risk space it is anything but balanced.</p>
+
+<h3>The numbers</h3>
+<p>Typical inputs: SPY at $\sigma_e = 16\%$, AGG at $\sigma_b = 6\%$, $\rho = -0.10$.</p>
+<p>Portfolio variance: $0.6^2 \cdot 0.16^2 + 0.4^2 \cdot 0.06^2 + 2 \cdot 0.6 \cdot 0.4 \cdot (-0.10) \cdot 0.16 \cdot 0.06$.</p>
+<p>= 0.009216 + 0.000576 - 0.000461 = 0.009331.</p>
+<p>Portfolio vol = 9.66%.</p>
+<p>Risk contributions: $\text{RC}_e = 0.6 \cdot (\Sigma w)_1 / \sigma_p$. The numerator $(\Sigma w)_1 = 0.16^2 \cdot 0.6 + (-0.10) \cdot 0.16 \cdot 0.06 \cdot 0.4 = 0.01536 - 0.000384 = 0.014976$.</p>
+<p>$\text{RC}_e = 0.6 \cdot 0.014976 / 0.0966 = 0.0930$. That's 96% of total vol (0.0966).</p>
+<p>Bond contribution: 4%.</p>
+
+<h3>The headline</h3>
+<p>A "balanced" 60/40 portfolio is 96/4 in risk space. This is why 60/40 is essentially an equity bet with a small bond hedge. It's why risk parity (Lesson 14) was invented.</p>
+
+<h3>What 60/40 looks like by year</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Period</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">SPY-AGG correlation</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">60/40 vol</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Equity risk share</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">1990 to 1999</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">+0.20</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10.5%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">93%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">2000 to 2008</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">-0.30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">9.0%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">98%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">2009 to 2021</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">-0.30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">9.5%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">97%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">2022 onward</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">+0.40</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">12.0%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">94%</td></tr>
+  </tbody>
+</table>
+
+<p>Two takeaways. First, equity risk share stays in the 93 to 98% range across all regimes. Second, in 2022 the bond hedge broke (correlation went positive), portfolio vol jumped 25%, and 60/40 had its worst year since 2008 because the diversification stopped working. Risk parity had even worse 2022 because the leverage on bonds amplified the hit.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 Why Euler's theorem applies</h3>

@@ -130,6 +130,45 @@
   <strong>In practice (Macrosynergy):</strong> Macrosynergy does not use Black-Litterman directly. Their philosophical equivalent is conceptual parity: pin weights by economic justification (each macro factor gets equal risk budget), do not let the data move them. BL is closer to the "tactical asset allocation" practice at large institutions (Goldman, BlackRock, AQR for some products). Where MS sits is more like "build your alpha from macro signals, then equal-weight, never optimise". A useful synthesis: use BL to combine an equilibrium prior with a Macrosynergy macro signal as the view. The BL posterior gives you mean-shifts that respect both.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: encoding views in the wild</h2>
+
+<p>Translating qualitative views to BL inputs is where most BL implementations get sloppy. Four worked examples.</p>
+
+<h3>Example 1: simple absolute view</h3>
+<p>"US equities will return 7% annually" with high confidence.</p>
+<p>$P = (1, 0, 0, 0, 0)$, $Q = 0.07$, $\Omega = \tau \cdot P \Sigma P^\top \cdot \theta$ where $\theta < 1$ is a confidence multiplier. For high confidence $\theta = 0.1$: $\Omega \approx 0.0008$ on the diagonal. Posterior US equity return moves close to 7%.</p>
+
+<h3>Example 2: relative view</h3>
+<p>"European equities outperform US equities by 2%" with medium confidence.</p>
+<p>$P = (-1, 1, 0, 0, 0)$, $Q = 0.02$. The view is on the spread, not the absolute level. With medium confidence ($\theta = 1$), the spread shifts toward 2% but absolute levels barely move from equilibrium.</p>
+
+<h3>Example 3: portfolio view (cross-sectional rank)</h3>
+<p>"Top quartile of value stocks outperforms bottom quartile by 4%". $P$ has +1/N in the top quartile rows, -1/N in the bottom, zero elsewhere. $Q = 0.04$. This encodes a classic value strategy.</p>
+
+<h3>Example 4: hedged view</h3>
+<p>"US equities up 5%, but I want to express this without taking sector risk". $P$ is a beta-neutral or sector-neutral combination. The Idzorek (2005) extension shows how to encode "I want to bet $w$% conditional on the view materialising".</p>
+
+<h3>The three confidence calibrations</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Method</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Specification</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Best for</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Idzorek (% confidence)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\Omega$ chosen so that 100% confidence implements view fully</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Practitioners with intuitive "% confidence" inputs</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Self-scaling ($\tau P \Sigma P^\top$)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\Omega_{kk} = \tau \cdot p_k^\top \Sigma p_k$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Default. Avoids manual calibration.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Manual (bp-squared)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\Omega_{kk}$ set explicitly in basis-point variance</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Strong views with specific uncertainty bounds</td></tr>
+  </tbody>
+</table>
+
+<h3>The three traps</h3>
+<p><strong>Trap 1.</strong> Forgetting to specify $\tau$. Default $\tau = 1/T$ where $T$ is your effective sample size. Common values 0.025 (40 years of monthly) to 0.10 (30 months).</p>
+<p><strong>Trap 2.</strong> Using too many views. With $N$ assets and $K$ views, the effective dimension reduction goes from $N$ to $N - K$. Past 10 views, you are essentially specifying $\mu$ directly.</p>
+<p><strong>Trap 3.</strong> Inconsistent views. Two views that contradict produce posterior chaos. Always check that $P^\top \Omega^{-1} P$ has reasonable condition number.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 The reverse optimisation derivation</h3>

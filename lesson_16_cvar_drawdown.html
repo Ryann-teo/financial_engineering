@@ -128,6 +128,50 @@
   <strong>In practice (Macrosynergy art 220 + every other strategy):</strong> The MS production stack for any strategy is volatility targeting (Lesson 21) + MinMax drawdown control (this lesson). CVaR is reserved for academic comparison and stress reporting. The reason: vol targets and drawdown stops respond fast (within a week of regime shift). Parametric CVaR depends on a fixed loss distribution that is wrong during regime transitions.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: tuning MinMax drawdown control</h2>
+
+<p>Two parameters: threshold $D^\star$ and aversion $\kappa$. Both matter; pick them by walk-forward backtest.</p>
+
+<h3>The leverage curve as a function of drawdown</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Current drawdown</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\kappa = 5$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\kappa = 15$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\kappa = 30$</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">12% (just past $D^\star = 10\%$)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">90%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">74%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">55%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">61%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">22%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">35%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">29%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~0%</td></tr>
+  </tbody>
+</table>
+
+<h3>Choosing $D^\star$</h3>
+<p>$D^\star$ should be set just above the typical "noise" drawdown of your strategy. If your strategy has 8% vol and routine drawdowns of 6 to 8%, $D^\star = 10$ to 12% triggers only on real stress. Setting $D^\star$ too low (5%) creates whipsaws: the overlay deleverages on every minor drawdown and reactivates as soon as the drawdown shrinks.</p>
+
+<h3>Choosing $\kappa$</h3>
+<p>$\kappa$ controls how aggressively the deleverage kicks in past $D^\star$. Common ranges:</p>
+<ul>
+  <li><strong>$\kappa = 5$ to 10:</strong> Mild. Cuts deep drawdowns by 30 to 50%. Sharpe usually unchanged.</li>
+  <li><strong>$\kappa = 15$ to 25:</strong> Production default. Cuts drawdowns by 50 to 70%. Slight Sharpe gain in some regimes, slight loss in others.</li>
+  <li><strong>$\kappa = 30$ to 50:</strong> Aggressive. Cuts drawdowns dramatically but at the cost of locking in losses (the strategy may not recover before mean-reversion takes over).</li>
+</ul>
+
+<h3>The lock-in trap</h3>
+<p>Aggressive deleveraging at the trough means you participate less in the recovery. For trend-following strategies (where the trend reverses after stress), this can cost more than it saves. For carry strategies (where stress is followed by gradual normalisation), MinMax helps.</p>
+
+<h3>Empirical results from Macrosynergy art 220</h3>
+<p>Applied to the flagship cross-asset strategy:</p>
+<ul>
+  <li>Without MinMax: max DD 18%, Sharpe 1.8.</li>
+  <li>With MinMax ($D^\star = 12\%$, $\kappa = 15$): max DD 11%, Sharpe 1.7.</li>
+</ul>
+<p>Lost 5% of Sharpe to cut max drawdown by 40%. Most investors prefer this trade.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Why the RU LP works</h3>
 <p>$\text{CVaR}_\alpha(L) = \min_c \mathbb{E}[c + \tfrac{1}{1-\alpha}(L - c)^+]$. Take the empirical version with $T$ scenarios, replace $\mathbb{E}$ by sample average. The $(L - c)^+$ pieces become $\eta_t = \max(0, L_t - c)$. Standard linearisation puts $\eta_t \ge L_t - c$, $\eta_t \ge 0$ and minimises $c + \tfrac{1}{(1-\alpha)T} \sum \eta_t$.</p>

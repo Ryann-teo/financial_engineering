@@ -132,6 +132,69 @@
   <strong>In practice (Macrosynergy, conceptual parity):</strong> Macrosynergy does not run Markowitz in production. Their answer to error maximisation is conceptual parity: equal-weight macro signals within a theme, equal-weight themes across an asset, equal-weight assets across a strategy. Articles 3 (cross-asset relative value), 28 (signal optimisation), and 50 (signal evaluation) all explicitly avoid optimising weights. The Sharpe loss vs an "ideal" optimised weighting is small. The robustness gain is large. This is the empirical philosophy that DGU formalised.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: a worked numerical example</h2>
+
+<p>Concrete numbers always beat abstract math. Let's work through error maximisation on a 2-asset problem you can verify by hand.</p>
+
+<h3>Setup</h3>
+<p>Two assets. True parameters:</p>
+<ul>
+  <li>$\mu_1 = 8\%$, $\mu_2 = 4\%$ annualised.</li>
+  <li>$\sigma_1 = 16\%$, $\sigma_2 = 6\%$.</li>
+  <li>$\rho = 0.20$.</li>
+</ul>
+<p>True covariance: $\Sigma = \begin{bmatrix} 0.0256 & 0.00192 \\ 0.00192 & 0.0036 \end{bmatrix}$.</p>
+<p>The true tangency weights (using $r_f = 0$): $w_T \propto \Sigma^{-1} \mu = (3.5, 9.2)$ before normalisation. After scaling to sum to 1: $w_T \approx (0.28, 0.72)$. Tangency Sharpe: 0.85.</p>
+
+<h3>Add 200 bp of noise to $\mu$</h3>
+<p>Suppose your estimate is $\hat\mu_1 = 8\% + 2\% = 10\%$ (overestimated by 200 bp). Re-solve the tangency:</p>
+<p>$\hat w_T \propto \Sigma^{-1} (0.10, 0.04)^\top = (4.3, 8.8)$. After normalisation: $\hat w_T \approx (0.33, 0.67)$.</p>
+<p>So a 200 bp upward bias on asset 1's mean shifted its weight from 28% to 33%. <strong>The weight is much more sensitive to noise than the input itself.</strong> Asset 1's weight increased by 5 percentage points (18% relative) for a 200 bp absolute error.</p>
+
+<h3>Now overestimate by 500 bp</h3>
+<p>$\hat w_T \approx (0.42, 0.58)$. Now we are 50% overweight asset 1 vs the true optimum. The "best" portfolio under this noisy estimate is a quite different allocation.</p>
+
+<h3>The condition number explains it</h3>
+<p>$\Sigma$ has eigenvalues 0.026 and 0.0035. Condition number $\kappa = 7.4$. The weight error is approximately $\kappa$ times the relative input error. Across a large universe with $\kappa$ in the hundreds or thousands, the amplification is brutal.</p>
+
+<h3>The Marcenko-Pastur cliff in numbers</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$T/N$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\lambda_{\min}$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\lambda_{\max}$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Condition number</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.74</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3.5</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.32</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.05</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">6.4</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.086</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.91</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">34</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.030</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3.30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">110</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.1</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.0023</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3.86</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1700</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.05</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.00057</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3.93</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">6900</td></tr>
+  </tbody>
+</table>
+<p>Read: with 50 assets and 60 months ($T/N = 1.2$), your sample covariance has condition number ~400 even when the true covariance is identity. Inverting it amplifies errors 400x.</p>
+
+<h3>Live: condition number cliff visualiser</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>$T/N$ ratio: <span class="value" id="tn_v">3.0</span></label>
+      <input type="range" id="tn" min="1.05" max="20" step="0.05" value="3.0">
+    </div>
+  </div>
+  <div id="mp_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Smallest eigenvalue $\lambda_-$</span><span class="stat-value" id="lam_min">0</span></div>
+    <div class="stat"><span>Largest eigenvalue $\lambda_+$</span><span class="stat-value" id="lam_max">0</span></div>
+    <div class="stat"><span>Condition number $\kappa$</span><span class="stat-value" id="cond_num">0</span></div>
+    <div class="stat"><span>Weight-error amplification</span><span class="stat-value" id="amp">0</span></div>
+  </div>
+</div>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 The derivative of optimal weights with respect to $\mu$</h3>
@@ -306,6 +369,42 @@ function update9() {
 }
 ['sigma_mu', 'trials', 'method'].forEach(id => document.getElementById(id).addEventListener('input', update9));
 update9();
+
+function updateMP() {
+  const tn = Number(document.getElementById('tn').value);
+  document.getElementById('tn_v').textContent = tn.toFixed(2);
+  const sqRatio = Math.sqrt(1 / tn);
+  const lamMin = Math.pow(1 - sqRatio, 2);
+  const lamMax = Math.pow(1 + sqRatio, 2);
+  const cond = lamMax / Math.max(lamMin, 1e-10);
+
+  document.getElementById('lam_min').textContent = lamMin.toFixed(4);
+  document.getElementById('lam_max').textContent = lamMax.toFixed(4);
+  document.getElementById('cond_num').textContent = cond.toFixed(0);
+  document.getElementById('amp').textContent = cond.toFixed(0) + 'x';
+
+  // Plot MP density: f(lambda) = sqrt((lam_max - lam)(lam - lam_min)) / (2*pi*lambda*(1/tn))
+  const xs = [];
+  const ys = [];
+  const n = 200;
+  for (let i = 0; i < n; i++) {
+    const lam = lamMin + (lamMax - lamMin) * i / (n - 1);
+    const num = Math.sqrt(Math.max(0, (lamMax - lam) * (lam - lamMin)));
+    const denom = 2 * Math.PI * lam * (1 / tn);
+    xs.push(lam);
+    ys.push(num / denom);
+  }
+  Plotly.react('mp_plot', [
+    { x: xs, y: ys, mode: 'lines', fill: 'tozeroy', line: { color: '#2b6cb0', width: 2 }, name: 'MP density' }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Eigenvalue (true Sigma = I)' },
+    yaxis: { title: 'Density' },
+    showlegend: false
+  }, { displayModeBar: false });
+}
+document.getElementById('tn').addEventListener('input', updateMP);
+updateMP();
 </script>
 </body>
 </html>

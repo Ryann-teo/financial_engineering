@@ -132,6 +132,64 @@
   <strong>In practice (Macrosynergy art 5, 245):</strong> Article 5 (FX with point-in-time GDP growth) uses 11-day EWMA for vol estimation as the production default. Article 245 ("Volatility-targeted equity allocation") quantifies the effect: SPY with 10% vol target produces 25% Sharpe improvement and 35 to 50% tail risk reduction over the unscaled equivalent. The MS production stack always combines vol targeting with drawdown control (Lesson 16); both layers respond to realised stress.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: the Moreira-Muir Sharpe gain</h2>
+
+<p>Vol targeting works because volatility is autocorrelated and partially predictable. Moreira and Muir (2017) quantify the Sharpe gain. Let's understand it precisely.</p>
+
+<h3>The intuition in one paragraph</h3>
+<p>Realised vol today predicts realised vol tomorrow. When vol is high (typically during stress), expected returns going forward are not as high as the realised vol implies, so high vol is "bad-deal vol": you take the risk but don't get paid for it. Vol targeting cuts exposure during these bad-deal periods. The Sharpe gain is the difference between the unconditional Sharpe and the average of conditional Sharpes weighted by inverse vol.</p>
+
+<h3>The math</h3>
+<p>Let realised conditional vol $\sigma_t$ have autocorrelation $\rho_v$ at the rebalancing horizon, and let the conditional Sharpe ratio be approximately constant. The vol-targeted Sharpe gain is:</p>
+<div class="formula">$$\Delta \text{SR} \approx \rho_v \cdot \text{SR}_{\text{base}} \cdot \frac{\text{Var}(\sigma_t)}{\mathbb{E}[\sigma_t]^2}$$</div>
+<p>The last factor is the "vol of vol" coefficient of variation, typically 0.20 to 0.40 for equity indices. With $\rho_v = 0.7$ and base Sharpe = 0.5, the Sharpe gain is roughly $0.7 \times 0.5 \times 0.3 = 0.105$. Modest but consistent across decades and asset classes.</p>
+
+<h3>Why it doesn't always work</h3>
+<p>If conditional vol is uncorrelated with future returns (e.g. inflation regimes, where high vol coincides with both high and low Sharpe), the vol-target gain shrinks. Empirically:</p>
+<ul>
+  <li><strong>Equity indices:</strong> $\rho_v = 0.7$, gain ~0.10 to 0.20 Sharpe.</li>
+  <li><strong>Bonds:</strong> $\rho_v = 0.5$, gain ~0.05 Sharpe.</li>
+  <li><strong>FX:</strong> $\rho_v = 0.4$, gain ~0.03 to 0.08 Sharpe.</li>
+  <li><strong>Crypto:</strong> $\rho_v = 0.6$, gain ~0.10 to 0.15 Sharpe but with high variance.</li>
+</ul>
+<p>The biggest gains are in the most fat-tailed assets where vol is most predictable.</p>
+
+<h3>The half-life trade-off in detail</h3>
+<p>Short half-life: tracks vol fast, captures regime shifts within days. Cost: noisy estimates, high turnover, more transaction costs.</p>
+<p>Long half-life: smooth, low turnover. Cost: slow to adapt, leaves money on the table during regime shifts.</p>
+<p>Optimal half-life depends on:</p>
+<ul>
+  <li>Persistence of vol regime: longer persistence = longer half-life works.</li>
+  <li>Cost level: higher costs = longer half-life (less turnover).</li>
+  <li>Asset autocorrelation in returns: more autocorrelated returns = shorter half-life better.</li>
+</ul>
+<p>Macrosynergy 11 days, RiskMetrics 30 days, AQR uses 60 days for some products. There is no one-size-fits-all answer.</p>
+
+<h3>Live: half-life Sharpe gain explorer</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Vol autocorrelation $\rho_v$: <span class="value" id="rv_v">0.7</span></label>
+      <input type="range" id="rv" min="0" max="0.95" step="0.05" value="0.7">
+    </div>
+    <div class="control">
+      <label>Vol-of-vol CoV: <span class="value" id="vv_v">0.30</span></label>
+      <input type="range" id="vv" min="0.05" max="0.6" step="0.02" value="0.30">
+    </div>
+    <div class="control">
+      <label>Base Sharpe: <span class="value" id="bs_v">0.50</span></label>
+      <input type="range" id="bs" min="0.1" max="1.5" step="0.05" value="0.50">
+    </div>
+  </div>
+  <div id="mm_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Base Sharpe</span><span class="stat-value" id="base_sr">0</span></div>
+    <div class="stat"><span>Predicted gain</span><span class="stat-value" id="gain">0</span></div>
+    <div class="stat"><span>Targeted Sharpe</span><span class="stat-value" id="tgt_sr">0</span></div>
+    <div class="stat"><span>Improvement</span><span class="stat-value" id="imp">0</span></div>
+  </div>
+</div>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 The "vol drag" misconception</h3>
 <p>Vol drag is not the reason vol targeting works. The geometric mean is roughly $\mu - \sigma^2/2$. Targeting fixed vol by changing leverage does not eliminate this. The Sharpe gain from vol targeting comes from negative autocorrelation in volatility levels (calm markets stay calm, stressed markets stay stressed) and the asymmetric impact of vol on returns.</p>
@@ -275,6 +333,43 @@ function update21() {
 }
 ['tgt', 'hl', 'ap'].forEach(id => document.getElementById(id).addEventListener('input', update21));
 update21();
+
+function updateMM() {
+  const rv = Number(document.getElementById('rv').value);
+  const vv = Number(document.getElementById('vv').value);
+  const bs = Number(document.getElementById('bs').value);
+  document.getElementById('rv_v').textContent = rv.toFixed(2);
+  document.getElementById('vv_v').textContent = vv.toFixed(2);
+  document.getElementById('bs_v').textContent = bs.toFixed(2);
+
+  const gain = rv * bs * vv;
+  const tgt = bs + gain;
+  document.getElementById('base_sr').textContent = bs.toFixed(2);
+  document.getElementById('gain').textContent = '+' + gain.toFixed(2);
+  document.getElementById('tgt_sr').textContent = tgt.toFixed(2);
+  document.getElementById('imp').textContent = (gain / bs * 100).toFixed(0) + '%';
+
+  // Plot gain vs autocorrelation for several CoVs
+  const rvGrid = [];
+  for (let r = 0; r <= 0.95; r += 0.02) rvGrid.push(r);
+  const lines = [0.15, 0.30, 0.45].map(cov => ({
+    x: rvGrid,
+    y: rvGrid.map(r => r * bs * cov),
+    mode: 'lines',
+    name: 'CoV = ' + cov.toFixed(2),
+    line: { width: 2 }
+  }));
+  lines.push({ x: [rv], y: [gain], mode: 'markers', marker: { size: 12, color: '#c53030', symbol: 'star' }, name: 'Current' });
+
+  Plotly.react('mm_plot', lines, {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Vol autocorrelation' },
+    yaxis: { title: 'Sharpe gain' },
+    legend: { orientation: 'h', y: -0.22 }
+  }, { displayModeBar: false });
+}
+['rv', 'vv', 'bs'].forEach(id => document.getElementById(id).addEventListener('input', updateMM));
+updateMM();
 </script>
 </body>
 </html>

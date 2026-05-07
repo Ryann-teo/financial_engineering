@@ -130,6 +130,66 @@
   <strong>In practice (Macrosynergy art 23, 88, 285):</strong> Macrosynergy uses ERC as the baseline and adds macro factor tilts as the alpha. Article 285 applies this to cross-country bond allocation. The structure is "two-fund": fund A is the risk-balanced book (ERC), fund B is the macro overlay. This is a clean separation between risk allocation and return prediction. Most MS systematic products use this structure.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: cyclical coordinate descent in detail</h2>
+
+<p>The CCD algorithm is the workhorse for ERC. Let's walk through the math step by step and watch it converge.</p>
+
+<h3>The 1D update derivation</h3>
+<p>At each step, fix all $w_j$ for $j \ne i$. Solve for $w_i$ such that asset $i$'s risk contribution equals $1/N$ of total. Risk contribution: $\text{RC}_i = w_i (\Sigma w)_i$. Total: $w^\top \Sigma w$. Setting $\text{RC}_i = (1/N) w^\top \Sigma w$:</p>
+<div class="formula">$$w_i \cdot \left[\Sigma_{ii} w_i + \sum_{j \ne i} \Sigma_{ij} w_j\right] = \frac{1}{N} w^\top \Sigma w$$</div>
+<p>Quadratic in $w_i$. Solve with the quadratic formula:</p>
+<div class="formula">$$w_i = \frac{-c_i + \sqrt{c_i^2 + 4 \Sigma_{ii} \cdot v / N}}{2 \Sigma_{ii}}$$</div>
+<p>where $c_i = \sum_{j \ne i} \Sigma_{ij} w_j$ and $v = w^\top \Sigma w$ at the current iteration.</p>
+
+<h3>Why CCD converges</h3>
+<p>The Spinu objective $\tfrac{1}{2} w^\top \Sigma w - \tfrac{1}{N} \sum \log w_i$ is strictly convex on the positive orthant. Each coordinate update solves the optimum along that coordinate exactly. Successive minimisations decrease the objective monotonically. Convergence to the unique global optimum is guaranteed.</p>
+
+<h3>Convergence rate</h3>
+<p>Empirically, CCD converges in 10 to 50 iterations for typical asset universes. For $N = 5$ to 20, single-digit milliseconds. For $N = 500$, still under one second. Faster than convex solvers (cvxpy) on this specific problem because the per-step closed form is cheap.</p>
+
+<h3>Live: CCD step animation</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Iteration step: <span class="value" id="step_v">0</span></label>
+      <input type="range" id="step" min="0" max="20" step="1" value="0">
+    </div>
+    <div class="control">
+      <label>Asset 1 vol: <span class="value" id="ds1_v">25</span></label>
+      <input type="range" id="ds1" min="5" max="40" step="1" value="25">
+    </div>
+    <div class="control">
+      <label>Asset 4 vol: <span class="value" id="ds4_v">15</span></label>
+      <input type="range" id="ds4" min="5" max="40" step="1" value="15">
+    </div>
+  </div>
+  <div id="ccd_plot" class="plot" style="height: 380px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Max RC minus min RC</span><span class="stat-value" id="rc_diff_step">0</span></div>
+    <div class="stat"><span>Convergence error</span><span class="stat-value" id="conv_err">0</span></div>
+  </div>
+</div>
+
+<h3>The leverage cost in numbers</h3>
+<p>Risk parity needs leverage to match equity-only Sharpe. Realistic numbers:</p>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Strategy</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Unlevered vol</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Sharpe (unlevered)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Leverage to match SPY vol (16%)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Net Sharpe at 1% borrow cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">60/40</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.55</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.6x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.49</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">ERC (4 asset)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">7%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.65</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.3x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.57</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Risk parity (8 asset)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">6%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.75</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.7x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.65</td></tr>
+  </tbody>
+</table>
+<p>Risk parity beats 60/40 even after leverage costs, but the margin shrinks. In low-rate regimes (2010 to 2021), borrow costs are tiny and the gain is larger; in high-rate regimes (2022 onward), the cost eats more of the gain.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Why Spinu's log barrier works</h3>
 <p>The first-order condition $\partial \mathcal{L} / \partial w_i = (\Sigma w)_i - 1 / (N w_i) = 0$ rearranges to $w_i (\Sigma w)_i = 1/N$. Sum over $i$: total risk equals $\sum_i 1/N = 1$, scaled by $w^\top \Sigma w = $ portfolio variance. So all asset risks equal $1/N$ of total. Multiply through by $w^\top \Sigma w$ and you get the ERC condition.</p>
@@ -255,6 +315,64 @@ function update14() {
 }
 ['het', 'rho'].forEach(id => document.getElementById(id).addEventListener('input', update14));
 update14();
+
+function ercStep(Sigma, w_init, max_iter) {
+  let w = w_init.slice();
+  for (let it = 0; it < max_iter; it++) {
+    for (let i = 0; i < N; i++) {
+      const Sw = matVec(Sigma, w);
+      const num = Sw[i] - Sigma[i][i] * w[i];
+      const totalVar = dot(w, Sw);
+      const disc = num * num + 4 * Sigma[i][i] * (1 / N) * totalVar;
+      w[i] = (-num + Math.sqrt(Math.max(disc, 0))) / (2 * Sigma[i][i]);
+    }
+    const s = w.reduce((a, b) => a + b, 0);
+    if (Math.abs(s) > 1e-9) w = w.map(x => x / s);
+  }
+  return w;
+}
+
+function updateCCD() {
+  const step = Number(document.getElementById('step').value);
+  const ds1 = Number(document.getElementById('ds1').value) / 100;
+  const ds4 = Number(document.getElementById('ds4').value) / 100;
+  document.getElementById('step_v').textContent = step;
+  document.getElementById('ds1_v').textContent = (ds1 * 100).toFixed(0);
+  document.getElementById('ds4_v').textContent = (ds4 * 100).toFixed(0);
+
+  const sigmasLocal = [ds1, 0.10, 0.18, ds4, 0.20];
+  const SigmaLocal = [];
+  for (let i = 0; i < N; i++) {
+    const r = [];
+    for (let j = 0; j < N; j++) r.push(sigmasLocal[i] * sigmasLocal[j] * (i === j ? 1 : 0.3));
+    SigmaLocal.push(r);
+  }
+  const w_init = new Array(N).fill(1 / N);
+  const w_step = ercStep(SigmaLocal, w_init, step);
+  const Sw = matVec(SigmaLocal, w_step);
+  const totalVar = dot(w_step, Sw);
+  const sigma_p = Math.sqrt(Math.max(totalVar, 0));
+  const rc = w_step.map((wi, i) => wi * Sw[i] / Math.max(sigma_p, 1e-9));
+  const rcShare = rc.map(x => x / Math.max(sigma_p, 1e-9) * 100);
+
+  const rcMax = Math.max(...rcShare);
+  const rcMin = Math.min(...rcShare);
+  document.getElementById('rc_diff_step').textContent = (rcMax - rcMin).toFixed(2) + ' pp';
+  document.getElementById('conv_err').textContent = (rcMax - rcMin < 0.01 ? 'converged' : ((rcMax - rcMin) / 100 * (1/N)).toExponential(2));
+
+  Plotly.react('ccd_plot', [
+    { x: asset_names, y: w_step.map(x => x * 100), type: 'bar', name: 'Weights at step ' + step, marker: { color: '#2b6cb0' } },
+    { x: asset_names, y: rcShare, type: 'bar', name: 'Risk shares (%)', marker: { color: '#c05621' } },
+    { x: asset_names, y: new Array(N).fill(100 / N), type: 'scatter', mode: 'lines', name: 'Target = 1/N', line: { color: '#22543d', dash: 'dash', width: 2 } }
+  ], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    barmode: 'group',
+    yaxis: { title: 'Percent' },
+    legend: { orientation: 'h', y: -0.18 }
+  }, { displayModeBar: false });
+}
+['step', 'ds1', 'ds4'].forEach(id => document.getElementById(id).addEventListener('input', updateCCD));
+updateCCD();
 </script>
 </body>
 </html>

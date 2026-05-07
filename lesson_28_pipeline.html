@@ -152,6 +152,44 @@
   <strong>In practice (Macrosynergy art 39):</strong> Article 39 ("How to build a macro trading strategy with open-source python") is the canonical MS pipeline reference. It documents the seven-layer stack with code. The MS open-source `macrosynergy` Python package implements layers 1 to 4. Layers 5 to 7 are typically built per-product. The whole flagship art 3 strategy is constructed using this exact architecture.
 </div>
 
+<h2 id="s_deep">8b. Deep dive: failure modes by layer</h2>
+
+<p>Each pipeline layer has its own characteristic failure mode. Knowing them tells you where to focus monitoring.</p>
+
+<h3>Failure modes by layer</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Layer</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Common failure</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">How to detect</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Data</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Look-ahead bias from revised series</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Compare backtest using vintage vs latest data; gap = bias</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Signal</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">IC decay over time</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Rolling 6/12 month IC vs full-sample IC; alarm at 50% drop</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Forecast</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Overfit signal weights</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">CPCV vs walk-forward Sharpe gap</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Optimisation</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Numerical instability in $\Sigma^{-1}$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Condition number of $\Sigma$, weight L1 norm</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Risk</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Vol target misses regime shift</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Realised vs target vol over rolling 22 days</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Execution</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Slippage exceeding cost model</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Realised vs modelled fill price; alarm at 2 sigma</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Monitoring</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Alarm fatigue from false positives</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Track alarm-to-action ratio; tune thresholds</td></tr>
+  </tbody>
+</table>
+
+<h3>The "every layer should fail loudly" principle</h3>
+<p>Silent failures are the worst. If the data layer drops a row of returns, the signal layer should crash, not silently propagate NaNs. If the optimiser doesn't converge, the risk layer should reject, not use stale weights. Build assertions and type contracts at every layer boundary.</p>
+
+<h3>Production diagnostics dashboard</h3>
+<p>Macrosynergy art 39 documents the open-source pipeline with explicit per-layer diagnostics. Production stack includes:</p>
+<ul>
+  <li>Daily IC report per signal vs 12-month rolling.</li>
+  <li>Realised vol vs target ratio.</li>
+  <li>Factor exposures against limits.</li>
+  <li>Top 10 PnL contributors and detractors.</li>
+  <li>Drawdown alarm at DD > 8%.</li>
+  <li>Weight stability: L1 norm of weight changes vs rolling average.</li>
+</ul>
+
 <h2 id="s_code">9. Coding exercises (extras)</h2>
 
 <h3>Exercise A: Pipeline class skeleton</h3>

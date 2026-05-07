@@ -147,6 +147,40 @@
   <strong>In practice (Macrosynergy art 38, 50, 65):</strong> The MS signal stack is the building blocks of every published strategy. Article 38 frames the "macro quantamental" approach. Article 50 gives the three-step protocol for evaluating any signal: (1) predictive correlation, (2) accuracy/hit-rate, (3) naive PnL. Article 65 expands this with quality diagnostics. The conceptual parity philosophy: equal-weight signals within a theme, equal-weight themes within an asset, equal-weight assets within a strategy. Never optimise the weights, even when in-sample tests favour optimisation.
 </div>
 
+<h2 id="s_deep">6b. Deep dive: style premia performance, century by century</h2>
+
+<p>The "style premia" framework rests on a simple empirical claim: carry, value, momentum, and defensive deliver positive Sharpe across asset classes and across decades. AQR's "Trends Everywhere" (Hurst, Ooi, Pedersen 2017) tested this on 100+ years. The numbers are surprisingly stable.</p>
+
+<h3>Long-run Sharpe by style and asset class</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Style</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Equities</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Bonds</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">FX</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Commodities</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Carry</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.4 to 0.7</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 to 0.7</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.4 to 0.6</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 to 0.7</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Value</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.3 to 1.0</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.3</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.35</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.30</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Momentum</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.6 to 0.9</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 to 0.8</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.6 to 0.8</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.6 to 0.9</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Defensive (BAB)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.4 to 0.8</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.7 (maturity)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">n/a</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.3 to 0.5</td></tr>
+  </tbody>
+</table>
+
+<h3>The combined Sharpe</h3>
+<p>Combining four styles equally across four asset classes gives roughly Sharpe 1.5 to 2.0 in raw backtests. Realistic implementation Sharpe (after costs, deflated, capacity-adjusted): 0.7 to 1.0. AQR's Style Premia Alternative Fund and similar products run in this range.</p>
+
+<h3>Why these survive</h3>
+<p>Three theories, all with empirical support:</p>
+<ul>
+  <li><strong>Risk premium.</strong> Each style is bearing a real risk that risk-averse investors pay you to bear. Value: bankruptcy risk. Carry: tail risk. Momentum: crash risk. Defensive: behavioural overweighting of lottery-like high-beta.</li>
+  <li><strong>Behavioural.</strong> Humans systematically misjudge value (extrapolate growth), momentum (reversals), defensive (overconfidence). Slow-moving capital can not arbitrage these away.</li>
+  <li><strong>Structural.</strong> Mandate constraints prevent some investors from accessing the strategies. Long-only mandates leave shorts unexploited. Pension fund constraints leave low-beta unfunded.</li>
+</ul>
+
 <h2 id="s_math">7. Mathematical companion</h2>
 <h3>7.1 Why the historical mean is a terrible $\mu$</h3>
 <p>The standard error of the sample mean of returns is $\sigma / \sqrt{T}$. For monthly returns at 15% annualised vol over 30 years, the standard error is $0.15 / \sqrt{30} \approx 2.7\%$. So your point estimate is $\hat \mu \pm 5.4\%$ (95% CI). That's bigger than most premia. The historical mean is the maximum likelihood estimator, but its sampling variance is so large that it's useless for portfolio optimisation.</p>

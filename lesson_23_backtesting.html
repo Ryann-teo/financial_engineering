@@ -137,6 +137,57 @@
   <strong>In practice (Macrosynergy art 50, 204):</strong> Article 50 ("Evaluating macro signals in three steps") gives the MS protocol: predictive correlation, accuracy, naive PnL. Article 204 ("Systematic trading strategies fooled by live records") quantifies the gap between in-sample and live performance: 30 to 50% Sharpe degradation is typical. CPCV and DSR are the formal tools for setting expectations honestly. MS uses CPCV-style validation in their published research and reports both in-sample and out-of-sample Sharpe.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: CPCV path counting and embargo design</h2>
+
+<p>CPCV's value depends on getting the path enumeration right. The "right" number of paths balances two things: more paths = better Sharpe distribution; more paths = more compute and more correlated paths.</p>
+
+<h3>How many paths do you get?</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">N (groups)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">k (test folds)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Number of CPCV paths</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Test fraction</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">6</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">33%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">9</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">36</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">30%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">12</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">55</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">25%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">12</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">4</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">165</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">33%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3,876</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">25%</td></tr>
+  </tbody>
+</table>
+
+<h3>Recommended setup</h3>
+<p>For a 20-year monthly backtest with monthly rebalancing:</p>
+<ul>
+  <li>$N = 12$ groups (each group = roughly 20 months).</li>
+  <li>$k = 3$ test folds.</li>
+  <li>Embargo = 22 days (one rebalancing period plus a buffer).</li>
+  <li>Result: 55 backtest paths, each using 25% of data as test.</li>
+</ul>
+
+<h3>Embargo length cookbook</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Strategy type</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Recommended embargo</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Daily mean reversion (1-day holding)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2 to 3 days</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Weekly trend (5-day holding)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 days</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Monthly macro signal (22-day holding)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">22 to 44 days</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Quarterly value (90-day holding)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">90 days</td></tr>
+  </tbody>
+</table>
+<p>Embargo should be at least the prediction horizon plus the typical position holding period. Too short: leakage. Too long: throws away data unnecessarily.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 The CPCV path count</h3>
 <p>For $N$ groups and test size $k$: number of test combinations is $\binom{N}{k}$. Each combination, when arranged chronologically, contributes $k$ contiguous test segments. Total backtest paths formed from concatenating segments: $\binom{N}{k} \cdot k / N$.</p>

@@ -138,6 +138,35 @@
   <strong>In practice (Macrosynergy art 28, 36, 39, 50, 25, 49):</strong> The MS approach. Article 28 covers basic statistical learning for signal optimisation. Article 36 uses random forests. Article 39 documents the open-source Python pipeline. Article 50 is the three-step signal evaluation protocol. Article 25 boosts signals; article 49 uses beta learning for time-varying signal weights. The conceptual parity philosophy: equal-weight signals within a theme, equal-weight themes, equal-weight assets. The MS flagship strategy (art 3) blends 5+ macro themes across 50+ instruments and beats most ML-blended versions out of sample. Simpler is robust.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: orthogonalisation in practice</h2>
+
+<p>Two correlated signals carry overlapping information. Orthogonalisation extracts the unique part of each. Used right, it can double a portfolio's effective breadth. Used wrong, it amplifies noise.</p>
+
+<h3>Worked example: trend and value on FX</h3>
+<p>Suppose you have two FX signals on G10 currencies: 12-month trend and 5-year mean reversion (value). Empirically these are negatively correlated (~ -0.20): when a currency has been trending up, it tends to be far from its long-term value, and vice versa.</p>
+
+<p>Naive equal-weight composite: gives both signals equal weight. Effective IC depends on the correlation: with $\rho = -0.20$, $K = 2$, individual IC = 0.06 each, the composite IC is 0.06 * sqrt(2) / sqrt(1 + (-0.2)) = 0.095. Slightly better than $\sqrt{2}$ because the negative correlation helps.</p>
+
+<p>Orthogonalised composite: project value onto the space orthogonal to trend. The orthogonalised value carries information independent of trend's information. Then weight trend and orthogonalised-value equally. The effective IC becomes 0.06 * sqrt(2) = 0.085 if we naively assume independence after orthogonalisation.</p>
+
+<p>Wait, that's lower. The benefit of orthogonalisation comes from correctness, not from raw IC. Orthogonalisation prevents you from double-weighting overlapping information.</p>
+
+<h3>When orthogonalisation helps</h3>
+<ul>
+  <li><strong>High correlation among signals.</strong> If 5 signals all correlate at 0.8, equal weighting essentially gives you 1 signal. Orthogonalising recovers the true 5-dimensional information set.</li>
+  <li><strong>Stacking related signals.</strong> Multiple value variants (P/B, P/E, P/S, P/CF). Each adds incremental info; orthogonalising prevents double counting.</li>
+</ul>
+
+<h3>When orthogonalisation hurts</h3>
+<ul>
+  <li><strong>Already independent signals.</strong> Negative or zero correlation. Orthogonalisation is a no-op or counterproductive (numerical noise).</li>
+  <li><strong>Sign sensitivity.</strong> The orthogonal component of value (after subtracting trend) might have opposite sign to value itself when trend is dominant. Counterintuitive, sometimes wrong.</li>
+  <li><strong>Estimation noise on the orthogonalisation.</strong> Computing the projection requires estimating signal correlation, which is itself noisy.</li>
+</ul>
+
+<h3>The Macrosynergy approach (conceptual orthogonalisation)</h3>
+<p>Rather than statistical orthogonalisation, MS uses theoretical orthogonalisation. They design signals from the start to be theoretically independent. For example: trend (price-based) and macro growth (fundamental). By construction these are independent at the conceptual level. Statistical orthogonalisation is unnecessary.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Composite IC for $K$ correlated signals</h3>
 <p>For equal-weight composite of $K$ signals each with IC $\rho_k$ and pairwise correlation $\rho$ (assume identical for simplicity):</p>

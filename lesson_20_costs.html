@@ -134,6 +134,47 @@
   <strong>In practice (Macrosynergy art 91, 366):</strong> Article 91 ("Transaction costs and portfolio strategies") quantifies cost drag across MS strategies. Article 366 covers bid-offer in OTC markets specifically. Macrosynergy's production default: monthly rebalancing for slow macro signals, weekly for trend, daily only for very high-frequency signals (rare). They use the L1 penalty rather than full square-root impact because the cvxpy speed is critical for hyperparameter tuning across many strategies.
 </div>
 
+<h2 id="s_deep">6b. Deep dive: realistic cost numbers by asset class</h2>
+
+<p>Cost models in textbooks are stylised. Real numbers per asset class look like this.</p>
+
+<h3>Linear cost (bid-ask + commissions, round-trip)</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Asset class</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Tight (bp round-trip)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Normal</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Wide / stress</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">US large-cap equity (SPY, AAPL)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1 to 2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3 to 5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 30</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">US small-cap</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 20</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">50 to 100</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">EM equity</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 20</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20 to 40</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100+</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Government bonds (UST, Bund)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 to 1</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1 to 2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 20</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">IG corporate bonds</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">30 to 60</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100 to 300</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">HY corporate bonds</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">30 to 80</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100 to 200</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">300 to 1000</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">G10 FX (EURUSD, USDJPY)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.2 to 0.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1 to 2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 20</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">EM FX (USDBRL)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100+</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Commodities (GLD, USO)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2 to 5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 15</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">30 to 100</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Crypto (BTC, ETH)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 15</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">20 to 50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100 to 500</td></tr>
+  </tbody>
+</table>
+
+<h3>Square-root impact constant $\eta$</h3>
+<p>$\eta \approx 0.142$ for US large-cap (Almgren et al., 2005). Roughly:</p>
+<ul>
+  <li>Equity: $\eta = 0.10$ to 0.20.</li>
+  <li>Bonds: $\eta = 0.05$ to 0.15 (less impact, more bid-ask).</li>
+  <li>FX: $\eta = 0.05$ to 0.10.</li>
+  <li>Commodities: $\eta = 0.15$ to 0.30.</li>
+  <li>Crypto: $\eta = 0.20$ to 0.50, highly variable.</li>
+</ul>
+
+<h3>Cost drag rule of thumb</h3>
+<p>Cost drag (annual basis points) $\approx$ annual turnover $\times$ round-trip cost. For 100% turnover and 5 bp cost: 5 bp drag. For 500% turnover and 30 bp cost: 150 bp drag, which destroys most macro signal alpha.</p>
+
 <h2 id="s_math">7. Mathematical companion</h2>
 <h3>7.1 The L1 penalty as turnover proxy</h3>
 <p>$\| w - w_{\text{old}} \|_1 = \sum_i |\Delta w_i|$ is the total trade volume in $\ell_1$ norm. Multiplying by $\kappa$ (cost per unit traded) gives the dollar cost. Convex, piecewise linear; cvxpy handles via the simplex algorithm.</p>

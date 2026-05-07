@@ -127,6 +127,47 @@
   <strong>In practice (Macrosynergy art 96, 300):</strong> Article 96 ("Copulas and trading strategies") demonstrates copulas for cross-asset carry. Article 300 on cross-asset carry copulas shows that the diversification benefits of cross-asset carry are smaller than Gaussian models predict because tail dependence rises during crises. Macrosynergy uses copulas mainly for stress testing and tail-risk attribution, not for optimisation. The production stack still uses vol targeting + drawdown control (Lessons 21, 16) because they react fast to realised tail clustering.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: tail dependence in numbers</h2>
+
+<p>Tail dependence quantifies how much asset crashes cluster together. Below are concrete $\lambda_L$ values across copulas and parameters.</p>
+
+<h3>Lower-tail dependence by copula</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Copula</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Parameter</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Linear correlation</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$\lambda_L$ (lower-tail dep)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Gaussian</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">$\rho = 0.5$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.00</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Student t (df=10)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">$\rho = 0.5$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.10</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Student t (df=4)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">$\rho = 0.5$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.30</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Student t (df=2)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">$\rho = 0.5$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Clayton</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">$\theta = 1$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~0.45</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.50</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Clayton</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">$\theta = 4$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~0.78</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.84</td></tr>
+  </tbody>
+</table>
+
+<h3>Empirical $\lambda_L$ for asset pairs</h3>
+<ul>
+  <li><strong>SPY-EFA (US-International equity):</strong> $\lambda_L \approx 0.45$, much higher than the Pearson correlation 0.65 would suggest under Gaussian.</li>
+  <li><strong>SPY-AGG (equity-bond):</strong> $\lambda_L \approx 0.05$ in calm regimes, jumps to 0.30 in 2008-style stress. Time-varying.</li>
+  <li><strong>EM equity pairs:</strong> $\lambda_L = 0.50$ to 0.65. Crashes co-cluster strongly.</li>
+  <li><strong>Crypto pairs (BTC-ETH):</strong> $\lambda_L \approx 0.70$. Almost always crash together.</li>
+</ul>
+
+<h3>Implications for portfolio construction</h3>
+<p>Diversification under heavy joint tails is less effective than under Gaussian. A "diversified" portfolio of US, EM, commodities under Gaussian assumptions might produce 99% VaR of 4%; under realistic heavy-tail copulas, the same portfolio's 99% VaR is closer to 6 to 7%. The implications:</p>
+<ol>
+  <li>Always stress-test portfolios under non-Gaussian dependence.</li>
+  <li>Use CVaR rather than variance as the optimisation objective.</li>
+  <li>Apply MinMax drawdown control as a runtime safety net (Lesson 16).</li>
+  <li>Monitor realised tail dependence during stress to detect "diversification breakdown".</li>
+</ol>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Why correlation under-tells the joint risk</h3>
 <p>Correlation is a moment of order 2. Tail dependence is a property of order $\infty$ (limit of conditional probabilities). They can disagree dramatically. Two distributions with identical covariance can have $\lambda_L = 0$ (Gaussian) and $\lambda_L = 0.7$ (Clayton).</p>

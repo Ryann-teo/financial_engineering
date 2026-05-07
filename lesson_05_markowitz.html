@@ -163,6 +163,65 @@
   <strong>In practice (Macrosynergy):</strong> MS does not implement Markowitz directly because of the estimation error problem (Lessons 9 to 13). They get the spirit of two-fund separation differently: every strategy is a vol-targeted bet, and the portfolio is a scaled mix of the strategy plus cash. The "tangency" role is played by the diversified strategy book (e.g. the cross-asset relative value trade in art 3), not by an optimised tangency portfolio. The economic logic of two-fund separation survives the death of $\Sigma^{-1}$.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: risk aversion $\lambda$ in detail</h2>
+
+<p>The risk aversion parameter $\lambda$ is the central dial of the Markowitz problem. It deserves its own discussion because most people pick it badly.</p>
+
+<h3>What $\lambda$ actually is</h3>
+<p>$\lambda$ is the Lagrange multiplier on a hidden variance constraint. The equivalence:</p>
+<div class="formula">$$\max_w \, w^\top \mu - \tfrac{\lambda}{2} w^\top \Sigma w \quad \Leftrightarrow \quad \max_w \, w^\top \mu \text{ s.t. } w^\top \Sigma w \le \bar v$$</div>
+<p>For a given $\bar v$, there is a unique $\lambda$ that produces the same optimum. Sliding $\lambda$ traces the entire frontier; each $\lambda$ corresponds to a different tolerance for risk.</p>
+
+<h3>Calibrating $\lambda$ from data</h3>
+<p>Three ways:</p>
+<ol>
+  <li><strong>Implied from market portfolio.</strong> $\lambda = (\mu_m - r_f) / \sigma_m^2$. For SPY: $(0.06) / (0.16)^2 \approx 2.3$. The "Black-Litterman default".</li>
+  <li><strong>From CRRA utility.</strong> $\lambda = \gamma / (1 + \gamma w^\top \mu)$ approximately, where $\gamma$ is the CRRA coefficient. For $\gamma = 4$ and small $w^\top \mu$: $\lambda \approx 4$.</li>
+  <li><strong>From target volatility.</strong> $\lambda = \mu^\top \Sigma^{-1} \mu / \sigma_{\text{target}}^2$ approximately. Target 10% vol from a tangency-Sharpe-1.0 universe gives $\lambda \approx 100$. Yes, the units are odd.</li>
+</ol>
+
+<h3>Reasonable $\lambda$ ranges by investor type</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Investor type</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Typical $\lambda$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Why</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Hedge fund (aggressive)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 to 2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Target vol 15 to 25%, leverage allowed.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Multi-strategy</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2 to 5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Target vol 8 to 12%, balanced.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Pension fund</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 15</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Long-horizon, regulated, conservative.</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Insurance</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10 to 30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Liability-driven, capital-constrained.</td></tr>
+  </tbody>
+</table>
+
+<h3>The $\lambda$ trap: arbitrarily small or large is wrong</h3>
+<p>$\lambda \to 0$ means "infinite risk appetite": the optimiser concentrates 100% in the highest-mean asset (or shorts the lowest). $\lambda \to \infty$ collapses to minimum variance, ignoring expected returns entirely. Neither extreme is a real preference. Pick from the table or calibrate to a vol target.</p>
+
+<h3>The "wandering $\lambda$" production trick</h3>
+<p>In practice, many shops decouple $\lambda$ from preferences and use it as a turnover dial instead. Higher $\lambda$ produces lower-tracking-error portfolios; lower $\lambda$ produces more aggressive ones. The expected-return scaling is then absorbed by the magnitude of $\mu$.</p>
+
+<h3>Live: $\lambda$ to vol-target translator</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Tangency Sharpe: <span class="value" id="tsr_v2">0.80</span></label>
+      <input type="range" id="tsr2" min="0.2" max="2.0" step="0.05" value="0.8">
+    </div>
+    <div class="control">
+      <label>Target vol (%): <span class="value" id="tv_v">10</span></label>
+      <input type="range" id="tv" min="3" max="30" step="0.5" value="10">
+    </div>
+  </div>
+  <div id="lam_plot" class="plot" style="height: 280px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Implied $\lambda$ for target vol</span><span class="stat-value" id="lam_imp">0</span></div>
+    <div class="stat"><span>Resulting expected return</span><span class="stat-value" id="exp_ret">0</span></div>
+  </div>
+</div>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 Why the frontier is a hyperbola</h3>
@@ -383,6 +442,43 @@ function updateFrontier() {
 }
 ['lam', 'shift', 'rf'].forEach(id => document.getElementById(id).addEventListener('input', updateFrontier));
 updateFrontier();
+
+function updateLambdaTranslator() {
+  const tsr = Number(document.getElementById('tsr2').value);
+  const tv = Number(document.getElementById('tv').value) / 100;
+  document.getElementById('tsr_v2').textContent = tsr.toFixed(2);
+  document.getElementById('tv_v').textContent = (tv * 100).toFixed(1);
+
+  // For tangency: Sharpe = (mu - rf) / sigma. At target vol, expected excess return = tsr * tv.
+  // Implied lambda from MV: at the optimum, w' Sigma w = sigma_target^2 and (mu - rf) = lambda * Sigma w.
+  // Approximate: lambda * sigma_target = (mu - rf) / sigma_target = tsr  =>  lambda = tsr / sigma_target
+  const lam_imp = tsr / tv;
+  const exp_ret = tsr * tv;
+
+  document.getElementById('lam_imp').textContent = lam_imp.toFixed(2);
+  document.getElementById('exp_ret').textContent = (exp_ret * 100).toFixed(2) + '%';
+
+  // Plot: lambda vs target vol for several Sharpe levels
+  const tvGrid = [];
+  for (let v = 0.03; v <= 0.30; v += 0.005) tvGrid.push(v);
+  const lamCurves = [0.5, 0.8, 1.2, 1.6].map(sr => ({
+    x: tvGrid.map(v => v * 100),
+    y: tvGrid.map(v => sr / v),
+    mode: 'lines',
+    name: 'Sharpe = ' + sr.toFixed(1),
+    line: { width: 1.5 }
+  }));
+  lamCurves.push({ x: [tv * 100], y: [lam_imp], mode: 'markers', marker: { size: 12, color: '#c53030', symbol: 'star' }, name: 'Current' });
+
+  Plotly.react('lam_plot', lamCurves, {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Target volatility (%)' },
+    yaxis: { title: 'Implied lambda', type: 'log' },
+    legend: { orientation: 'h', y: -0.25 }
+  }, { displayModeBar: false });
+}
+['tsr2', 'tv'].forEach(id => document.getElementById(id).addEventListener('input', updateLambdaTranslator));
+updateLambdaTranslator();
 </script>
 
 </body>

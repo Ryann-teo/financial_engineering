@@ -129,6 +129,51 @@
   <strong>In practice (Macrosynergy / AQR):</strong> Macrosynergy doesn't use Kelly directly. Their vol targeting (Lesson 21) is implicitly fractional Kelly: target a fixed vol level rather than maximise log growth. Empirically, MS strategies sit in the $f \approx 0.3$ to $0.5$ range when expressed in Kelly units. AQR's risk parity products are also implicit fractional Kelly. Full Kelly is the academic benchmark; fractional Kelly is what survives in production.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: probability of ruin and drawdown by Kelly fraction</h2>
+
+<p>Kelly's beauty is theoretical. Kelly's brutality is practical. Below are concrete probabilities of catastrophic loss as a function of Kelly fraction $f$ and true Sharpe.</p>
+
+<h3>Probability of 50% drawdown over 20 years</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Kelly fraction $f$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">True SR = 0.5</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">True SR = 1.0</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">True SR = 1.5</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.25 (quarter Kelly)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">8%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">&lt;1%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5 (half Kelly)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">25%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.0 (full Kelly)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~50%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~50%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~50%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5 (over-Kelly)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~80%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~80%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~80%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.0 (double Kelly)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~100%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~100%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">~100%</td></tr>
+  </tbody>
+</table>
+
+<h3>Median terminal wealth growth (multiple of starting capital, 20 years)</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Kelly fraction</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">SR = 0.5</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">SR = 1.0</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">SR = 1.5</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.25</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.7x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3.6x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">8.0x</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.7x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">11x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">42x</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.0</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.7x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">11x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">42x</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.5x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3x</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5x</td></tr>
+  </tbody>
+</table>
+<p>Read: between half-Kelly and full-Kelly the median wealth is roughly the same (the function is flat at the optimum), but drawdown probability quintuples. Half-Kelly gives you 90% of the wealth at 20% of the variance.</p>
+
+<h3>The "Kelly under estimation error" disaster</h3>
+<p>Suppose your true Sharpe is 1.0, but you estimate $\hat{SR} = 1.5$ (50% upward bias). Run "full Kelly" on the wrong estimate. Your effective fraction is $1.5 / 1.0 = 1.5$ Kelly. P(50% DD) = 80%. Real Sharpe is unchanged at 1.0; you just took on much more risk than you wanted. This is why fractional Kelly with $f \le 0.5$ is the safe production default.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Kelly's growth-rate derivation</h3>
 <p>For a single bet with prob $p$ to win $b$ and prob $q = 1-p$ to lose 1, the log growth at fraction $f$ is</p>

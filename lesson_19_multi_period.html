@@ -137,6 +137,39 @@
   <strong>In practice (Macrosynergy, AQR):</strong> Most macro and systematic shops use rolling reoptimisation rather than HJB. Macrosynergy's pipeline (art 39) re-evaluates signals each rebalancing period without forecasting their persistence. AQR's research suggests that long-horizon investors gain only modest utility from full HJB versus naive rolling, given realistic estimates of return predictability. Article 186 explores reinforcement learning as an alternative to HJB for trading systems.
 </div>
 
+<h2 id="s_deep">6b. Deep dive: when does dynamic actually beat myopic?</h2>
+
+<p>The Merton hedging demand sounds elegant in theory. In practice, it adds Sharpe only when very specific conditions hold. Knowing them tells you when to bother.</p>
+
+<h3>The three conditions for non-trivial hedging demand</h3>
+<ol>
+  <li><strong>Investment opportunities are time-varying.</strong> If $\mu_t$ and $\Sigma_t$ are constant, Merton collapses to single-period MV regardless of horizon.</li>
+  <li><strong>The state variable is partially predictable.</strong> If you cannot forecast where opportunities are heading, you cannot hedge against them.</li>
+  <li><strong>Risk aversion $\gamma \ne 1$.</strong> Log utility ($\gamma = 1$) is myopic by construction. Non-log CRRA is required for hedging demand.</li>
+</ol>
+
+<h3>Empirical magnitudes</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Setup</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Hedging demand</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Sharpe gain</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Equity premium AR(1) with $\rho = 0.95$, $\gamma = 4$, 20-year horizon</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">+15% to +30% on equity</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">+0.05 to +0.10</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Same with $\rho = 0.5$ (less persistent)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">+5% to +10%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">+0.02 to +0.05</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Iid returns, any $\gamma$</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Log utility ($\gamma = 1$), any dynamics</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0%</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0</td></tr>
+  </tbody>
+</table>
+
+<h3>Why most production systems use rolling MV</h3>
+<p>The hedging demand Sharpe gain is small relative to the cost of getting it wrong. Misspecifying the state-variable dynamics produces a Merton solution that's biased in one direction and stays there. Rolling reoptimisation is robust to misspecification because it adapts each period.</p>
+
+<p>Campbell and Viceira (2002) calibrated a careful long-horizon model with conservative assumptions and got Sharpe gains of 0.05 to 0.10 over 20-year horizons. Real production systems usually leave this on the table because the cost of model risk exceeds the alpha.</p>
+
 <h2 id="s_math">7. Mathematical companion</h2>
 <h3>7.1 Merton's solution under CRRA + GBM</h3>
 <p>Wealth follows $dW = W [r_f + w (\mu - r_f)] dt + W w \sigma dB$. Maximise $\mathbb{E}[u(W_T)]$. Hamilton-Jacobi-Bellman gives a Riccati equation that solves analytically. The optimal $w^\star = (\mu - r_f) / (\gamma \sigma^2)$ is constant in time, only depends on parameters.</p>

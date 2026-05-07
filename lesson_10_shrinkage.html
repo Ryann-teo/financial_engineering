@@ -126,6 +126,39 @@
   <strong>In practice (Macrosynergy art 4, 25, 45):</strong> Macrosynergy's regression-based ML signal pipeline (article 4) uses ridge as the workhorse precisely because of its shrinkage interpretation. Article 25 boosts ridge regressors and gets to Sharpe 1.1 on FX trading across 29 currencies. Article 45 ("How to adjust regression-based trading signals for reliability") extends shrinkage to time-varying weights. The Macrosynergy default: ridge with cross-validated lambda, refit monthly. They never use OLS on macro data.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: optimal $\delta^\star$ as a function of $T/N$</h2>
+
+<p>The Ledoit-Wolf optimal shrinkage intensity is not arbitrary. It is the value that minimises expected MSE between the shrunk estimate and the true covariance. For Gaussian data, there is a clean approximate formula.</p>
+
+<h3>Heuristic formula</h3>
+<p>For Gaussian iid data with target $F$ that captures the "right" structure:</p>
+<div class="formula">$$\delta^\star \approx \frac{c \cdot N/T}{c \cdot N/T + d^2}$$</div>
+<p>where $c$ depends on the variance of sample covariance entries and $d$ is the Frobenius distance from sample to target. As $T/N$ grows, $\delta^\star \to 0$. As $T/N \to 1$, $\delta^\star \to 1$.</p>
+
+<h3>Concrete numbers</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$T/N$</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Optimal $\delta^\star$ (constant correlation target)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">OOS variance vs sample</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.05 to 0.10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">90 to 95% (small gain)</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.15 to 0.25</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">75 to 85%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.30 to 0.50</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">55 to 70%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.55 to 0.80</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">35 to 50%</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.2</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.80 to 0.95</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">15 to 30%</td></tr>
+  </tbody>
+</table>
+
+<h3>The "$\delta^\star = 0.2$ default" trap</h3>
+<p>Some practitioners use a fixed $\delta = 0.2$ regardless of $T/N$. This is fine for $T/N \approx 10$ but disastrous when $T/N \to 1$. Always compute the data-driven $\delta^\star$ via Ledoit-Wolf, not a hardcoded constant.</p>
+
+<h3>Nonlinear shrinkage in numbers</h3>
+<p>Linear shrinkage applies the same intensity to all eigenvalues. Nonlinear shrinkage applies different intensities to different eigenvalues, calibrated via random matrix theory. For $N = 50, T = 60$, nonlinear typically delivers another 10 to 20% reduction in OOS variance over linear. For $N = 500, T = 60$, the gain is 30 to 50%. Bigger gains in the high-dimensional regime.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 Why James-Stein dominates the sample mean</h3>

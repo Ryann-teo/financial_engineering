@@ -127,6 +127,46 @@
   <strong>In practice (Macrosynergy art 89, 111, 136, 76, 220):</strong> Article 89 uses correlation matrix eigenstructure as a regime classifier (when the largest eigenvalue dominates, all assets move together = stress). Articles 111 and 136 use random forests with macro features. Article 76 maps macroeconomic cycles to asset class returns. Article 220 uses drawdown itself as a regime indicator. The MS production stack: 2-state HMM on cross-asset correlations + macro feature random forest + drawdown control. Smooth tilting on the combined regime probability.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: regime persistence and the whipsaw problem</h2>
+
+<p>Regime classifiers are useful only if the regime persists long enough to act on. Below: how to calibrate persistence and avoid whipsawing.</p>
+
+<h3>Empirical regime durations</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Regime indicator</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Typical "calm" duration</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Typical "stress" duration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">VIX above 30</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">12 to 24 months</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2 to 6 months</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">NBER recession</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">5 to 10 years</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">8 to 18 months</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Cross-asset correlation regime</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">6 to 18 months</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3 to 9 months</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Inflation surprise regime</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2 to 5 years</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">6 months to 2 years</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Drawdown regime (DD &gt; 10%)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">12 to 36 months</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">3 to 12 months</td></tr>
+  </tbody>
+</table>
+
+<h3>Calibrating HMM transition probabilities</h3>
+<p>For an HMM with daily data and expected regime duration of 60 days: $T_{ii} = 1 - 1/60 \approx 0.983$. Higher transition probability means faster switching but more false alarms.</p>
+
+<p>Rule of thumb: set $T_{ii}$ such that expected duration matches your prior. For a "stress regime" with prior duration of 90 days, $T_{stress, stress} = 0.989$. For "normal regime" with prior duration of 540 days (1.5 years), $T_{calm, calm} = 0.998$.</p>
+
+<h3>The whipsaw problem</h3>
+<p>If regime probability hovers near 0.5, a hard switching policy whipsaws: in regime 1 today, switches to regime 2 tomorrow, back to regime 1 the day after. Each switch costs transaction costs and signals noise rather than information.</p>
+
+<p>Three remedies:</p>
+<ul>
+  <li><strong>Smooth tilting (preferred).</strong> Weight by probability rather than picking a single state. Tilts smoothly with confidence.</li>
+  <li><strong>Hysteresis.</strong> Switch to stress only when $P(stress) > 0.7$, switch back when $P(stress) < 0.3$. Asymmetric thresholds.</li>
+  <li><strong>Dwell time minimum.</strong> Once a regime is detected, stay in it for at least N days regardless of new data. Cap turnover.</li>
+</ul>
+
+<h3>The 2018 Q4 example</h3>
+<p>In Dec 2018 the equity market dropped 20%. Volatility regime classifiers fired "stress". By Jan-Feb 2019 the market recovered. Strategies that hard-switched to defensive in late 2018 missed the recovery and underperformed. Strategies with smooth tilting captured the average regime probability and outperformed both extremes.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 The Baum-Welch algorithm</h3>
 <p>EM algorithm for HMMs. Iterate:</p>

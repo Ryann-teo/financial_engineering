@@ -523,13 +523,26 @@ function linspace(a, b, n) {
 // =========== Section 3: variance vs w_1 ===========
 function portVarTwo(w1, s1, s2, rho) {
   const w2 = 1 - w1;
-  return w1*w1*s1*s1 + w2*w2*s2*s2 + 2*w1*w2*rho*s1*s2;
+  const v = w1*w1*s1*s1 + w2*w2*s2*s2 + 2*w1*w2*rho*s1*s2;
+  return Math.max(0, v); // numerical floor; w'Sigma w is mathematically non-negative
+}
+function avgVarTwo(w1, s1, s2) {
+  const w2 = 1 - w1;
+  // weighted average if rho were +1 (max correlation): same formula with rho=1
+  return w1*w1*s1*s1 + w2*w2*s2*s2 + 2*w1*w2*1*s1*s2;
 }
 function updateS3() {
-  const s1 = parseFloat(document.getElementById('s1').value) / 100;
-  const s2 = parseFloat(document.getElementById('s2').value) / 100;
-  const rho = parseFloat(document.getElementById('rho').value);
-  const w = parseFloat(document.getElementById('w').value);
+  const s1Raw = Number(document.getElementById('s1').value);
+  const s2Raw = Number(document.getElementById('s2').value);
+  const rhoRaw = Number(document.getElementById('rho').value);
+  const wRaw = Number(document.getElementById('w').value);
+
+  // Robust defaults if any input is somehow NaN
+  const s1 = (Number.isFinite(s1Raw) ? s1Raw : 20) / 100;
+  const s2 = (Number.isFinite(s2Raw) ? s2Raw : 10) / 100;
+  const rho = Number.isFinite(rhoRaw) ? rhoRaw : -0.20;
+  const w = Number.isFinite(wRaw) ? wRaw : 0.60;
+
   document.getElementById('s1_v').textContent = (s1*100).toFixed(0);
   document.getElementById('s2_v').textContent = (s2*100).toFixed(0);
   document.getElementById('rho_v').textContent = rho.toFixed(2);
@@ -537,28 +550,44 @@ function updateS3() {
 
   const grid = linspace(-0.5, 1.5, 200);
   const varCurve = grid.map(x => portVarTwo(x, s1, s2, rho));
-  // weighted average of individual variances (rho = 1 line)
-  const avgCurve = grid.map(x => x*x*s1*s1 + (1-x)*(1-x)*s2*s2 + 2*x*(1-x)*1*s1*s2);
+  const avgCurve = grid.map(x => avgVarTwo(x, s1, s2));
 
   const pv = portVarTwo(w, s1, s2, rho);
-  const avg = w*w*s1*s1 + (1-w)*(1-w)*s2*s2 + 2*w*(1-w)*1*s1*s2;
-  document.getElementById('port_var').textContent = pv.toFixed(6);
-  document.getElementById('port_vol').textContent = (Math.sqrt(Math.max(0, pv))*100).toFixed(2) + '%';
-  document.getElementById('avg_var').textContent = avg.toFixed(6);
-  document.getElementById('div_ben').textContent = ((avg - pv) > 0 ? ((avg - pv)*1e4).toFixed(2) + ' bp' : '0 bp');
+  const avg = avgVarTwo(w, s1, s2);
+  const portVol = Math.sqrt(pv);
+  const divBp = Math.max(0, (avg - pv) * 1e4);
 
-  Plotly.react('var_plot', [
-    { x: grid, y: avgCurve, type: 'scatter', mode: 'lines', name: 'Avg of variances ($\\rho=1$)', line: { color: '#c05621', dash: 'dash', width: 2 } },
-    { x: grid, y: varCurve, type: 'scatter', mode: 'lines', name: `Portfolio variance ($\\rho=${rho.toFixed(2)})`, line: { color: '#2b6cb0', width: 2.5 } },
-    { x: [w], y: [pv], type: 'scatter', mode: 'markers', name: 'Current $w_1$', marker: { size: 12, color: '#2b6cb0', line: { color: 'white', width: 2 } } }
-  ], {
-    margin: { l: 60, r: 30, t: 30, b: 50 },
-    xaxis: { title: 'Weight on asset 1' },
-    yaxis: { title: 'Portfolio variance' },
-    legend: { orientation: 'h', y: -0.20 }
+  document.getElementById('port_var').textContent = pv.toFixed(6);
+  document.getElementById('port_vol').textContent = (portVol * 100).toFixed(2) + '%';
+  document.getElementById('avg_var').textContent = avg.toFixed(6);
+  document.getElementById('div_ben').textContent = divBp.toFixed(2) + ' bp';
+
+  // Build traces explicitly to avoid LaTeX-in-name confusion
+  const traceAvg = {
+    x: grid, y: avgCurve, type: 'scatter', mode: 'lines',
+    name: 'Avg of variances (rho = 1)',
+    line: { color: '#c05621', dash: 'dash', width: 2 }
+  };
+  const traceVar = {
+    x: grid, y: varCurve, type: 'scatter', mode: 'lines',
+    name: 'Portfolio variance (rho = ' + rho.toFixed(2) + ')',
+    line: { color: '#2b6cb0', width: 2.5 }
+  };
+  const traceCurrent = {
+    x: [w], y: [pv], type: 'scatter', mode: 'markers',
+    name: 'Current w1',
+    marker: { size: 12, color: '#c53030', line: { color: 'white', width: 2 } }
+  };
+
+  Plotly.react('var_plot', [traceAvg, traceVar, traceCurrent], {
+    margin: { l: 60, r: 30, t: 30, b: 60 },
+    xaxis: { title: 'Weight on asset 1 (w_1)' },
+    yaxis: { title: 'Portfolio variance', rangemode: 'tozero' },
+    legend: { orientation: 'h', y: -0.22 }
   }, { displayModeBar: false });
 }
 ['s1','s2','rho','w'].forEach(id => document.getElementById(id).addEventListener('input', updateS3));
+window.addEventListener('load', updateS3);
 updateS3();
 
 // =========== Section 4: Covariance ellipse ===========

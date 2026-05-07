@@ -165,6 +165,53 @@
   <strong>In practice (Macrosynergy art 50, 65, 204):</strong> The MS protocol for evaluating a signal does NOT lead with Sharpe. It leads with the predictive correlation (signal vs forward return), then accuracy/hit rate, then naive PnL ratio. Sharpe is reported but never trusted as a single number. Article 204 ("Systematic trading strategies fooled by live records") quantifies how much in-sample Sharpe overstates live Sharpe across the MS catalog: a 30 to 50% degradation is typical. That gap is exactly what DSR is designed to predict and reject.
 </div>
 
+<h2 id="s_deep">5b. Deep dive: how big a sample do you need?</h2>
+
+<p>Concrete numbers for "is this Sharpe real?"</p>
+
+<h3>Standard error of estimated Sharpe by $T$</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">True SR</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$T = 36$ (3 yrs)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$T = 60$ (5 yrs)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$T = 120$ (10 yrs)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">$T = 240$ (20 yrs)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.5</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.18</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.14</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.07</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1.0</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.20</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.16</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.11</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.08</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">2.0</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.29</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.22</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.16</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.11</td></tr>
+  </tbody>
+</table>
+<p>Read: a strategy with true Sharpe 1.0 over 5 years has 95% CI of about $1.0 \pm 0.32$. Anything between 0.7 and 1.3 is consistent with "true Sharpe is 1". So if you see 0.8 in 5 years and someone else sees 1.1 in 5 years, statistically you have the same strategy.</p>
+
+<h3>Years of data needed to distinguish two Sharpes</h3>
+<p>Suppose strategy A has true Sharpe 0.8 and strategy B has true Sharpe 0.5. How many years of monthly returns do you need to confidently say A beats B?</p>
+<p>The required $T$ for 95% confidence is approximately $T \approx 2 \cdot (1.96 \cdot \sqrt{1 + 0.5(SR_A^2 + SR_B^2)} / (SR_A - SR_B))^2$.</p>
+<p>Plug in: $T \approx 2 \cdot (1.96 \cdot \sqrt{1 + 0.5 \cdot (0.64 + 0.25)} / 0.3)^2 = 2 \cdot (1.96 \cdot 1.20 / 0.3)^2 \approx 123$ months $\approx$ 10 years.</p>
+<p>You need 10 years of monthly data to distinguish a Sharpe-0.8 from a Sharpe-0.5 strategy. This is why "track record" arguments rarely settle anything.</p>
+
+<h3>The expected max Sharpe under the null, by $N$ trials</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">N trials</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Expected max Sharpe (T=60)</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Expected max Sharpe (T=120)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.32</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.23</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">100</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.51</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.36</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">1,000</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.66</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.47</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">10,000</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.79</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: center;">0.56</td></tr>
+  </tbody>
+</table>
+<p>Read: if you grid-searched 1000 strategy variants on 5 years of data, the best one with no skill should still show Sharpe ~0.66 by chance. So the bar for "real" is $\hat SR > 0.66 + $ a few standard errors $\approx 1.0$.</p>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 
 <h3>6.1 Why the standard error of Sharpe scales as $1/\sqrt{T}$</h3>

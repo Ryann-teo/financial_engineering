@@ -146,6 +146,71 @@
   <strong>In practice (Macrosynergy art 47, 74, 16):</strong> Article 47 builds macro factor models for sectoral equity. Article 74 finds latent trading factors via PCA on returns. Article 16 uses dimension reduction for macro factor extraction. MS combines macroeconomic factors (growth, inflation, monetary, financial conditions) with statistical factors. The risk model is fundamental + statistical hybrid. Used both for risk attribution and as the prior for signal blending (Lesson 26).
 </div>
 
+<h2 id="s_deep">5b. Deep dive: choosing the right factor model</h2>
+
+<p>Three flavours of factor models. Each has its niche.</p>
+
+<h3>Statistical (PCA on returns)</h3>
+<p>Most parsimonious. Factors come from the data, no economic interpretation.</p>
+<p><strong>Pros:</strong> always best in-sample fit, automatic, no theory needed.</p>
+<p><strong>Cons:</strong> rotation-dependent (PC1 might be "market" today and "growth" tomorrow), unstable when $T \approx N$, hard to attribute.</p>
+<p><strong>Use when:</strong> you need a covariance matrix and don't care what the factors mean. Risk decomposition for portfolio variance.</p>
+
+<h3>Fundamental (BARRA-style)</h3>
+<p>Loadings come from observable characteristics (P/B, market cap, GICS). Factor returns estimated cross-sectionally each period.</p>
+<p><strong>Pros:</strong> stable across regimes, interpretable, explains active risk well.</p>
+<p><strong>Cons:</strong> requires manual factor design, cross-sectional regression noise, factor returns can have look-ahead bias if not careful.</p>
+<p><strong>Use when:</strong> equity portfolios with clear style, sector, country dimensions. Most asset managers.</p>
+
+<h3>Macroeconomic (Chen-Roll-Ross)</h3>
+<p>Factors are observable macro variables: industrial production, inflation surprise, term spread, default spread.</p>
+<p><strong>Pros:</strong> economically grounded, links portfolios to macro narrative.</p>
+<p><strong>Cons:</strong> small set of significant macro factors, weak cross-sectional power.</p>
+<p><strong>Use when:</strong> cross-asset portfolios where macro drives correlations, regime analysis.</p>
+
+<h3>The hybrid approach (Macrosynergy)</h3>
+<p>Macrosynergy combines macro factors (from JPMaQS quantamental indicators) with statistical factors. The macro factors capture observable risk drivers; the statistical factors mop up residual covariance. Best of both: interpretable + statistically efficient.</p>
+
+<h3>Decision tree</h3>
+<table style="border-collapse: collapse; margin: 1rem 0; width: 100%;">
+  <thead>
+    <tr style="background: #ebf4ff;">
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0; text-align: left;">Use case</th>
+      <th style="padding: 0.5rem; border: 1px solid #e2e8f0;">Recommended model</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Single-asset-class equity (S&amp;P 500)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">FF5 or BARRA</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Global equity</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">BARRA Global with country and currency factors</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Cross-asset macro</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Macroeconomic + statistical</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Hedge fund attribution</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Style premia (carry, value, momentum, defensive, trend)</td></tr>
+    <tr><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Pure statistical (high N, low T)</td><td style="padding: 0.5rem; border: 1px solid #e2e8f0;">Statistical PCA + RMT cleaning</td></tr>
+  </tbody>
+</table>
+
+<h3>Live: portfolio rolling beta to market</h3>
+<div class="demo">
+  <div class="controls">
+    <div class="control">
+      <label>Portfolio nominal beta: <span class="value" id="beta_nom_v">1.0</span></label>
+      <input type="range" id="beta_nom" min="-0.5" max="2.0" step="0.05" value="1.0">
+    </div>
+    <div class="control">
+      <label>Beta drift std (per yr): <span class="value" id="bd_v">0.10</span></label>
+      <input type="range" id="bd" min="0" max="0.5" step="0.02" value="0.10">
+    </div>
+    <div class="control">
+      <label>Rolling window (months): <span class="value" id="bw_v">36</span></label>
+      <input type="range" id="bw" min="6" max="120" step="6" value="36">
+    </div>
+  </div>
+  <div id="beta_plot" class="plot" style="height: 320px;"></div>
+  <div class="stat-grid">
+    <div class="stat"><span>Average beta</span><span class="stat-value" id="avg_beta">0</span></div>
+    <div class="stat"><span>Beta range (5th to 95th pct)</span><span class="stat-value" id="bt_range">0</span></div>
+  </div>
+</div>
+
 <h2 id="s_math">6. Mathematical companion</h2>
 <h3>6.1 Single-index model derivation</h3>
 <p>Regress $r_i = \alpha_i + \beta_i r_m + \epsilon_i$ via OLS. The estimated $\hat \beta_i$ is $\text{Cov}(r_i, r_m) / \text{Var}(r_m)$. This is also the slope of the line through the data.</p>
@@ -272,6 +337,60 @@ function update24() {
 }
 ['bm', 'bv', 'bmo', 'idio'].forEach(id => document.getElementById(id).addEventListener('input', update24));
 update24();
+
+function mulberry32_b(seed) { return function() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randn_b(rng) { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+function updateBeta() {
+  const beta_nom = Number(document.getElementById('beta_nom').value);
+  const bd = Number(document.getElementById('bd').value);
+  const bw = Number(document.getElementById('bw').value);
+  document.getElementById('beta_nom_v').textContent = beta_nom.toFixed(2);
+  document.getElementById('bd_v').textContent = bd.toFixed(2);
+  document.getElementById('bw_v').textContent = bw;
+
+  // Simulate beta-drifting portfolio over 240 months
+  const n = 240;
+  const rng = mulberry32_b(2026);
+  const beta_t = new Array(n);
+  beta_t[0] = beta_nom;
+  for (let t = 1; t < n; t++) {
+    beta_t[t] = beta_t[t-1] + (bd / Math.sqrt(12)) * randn_b(rng);
+  }
+  // Compute rolling beta of an "estimator" with window bw
+  const sigma_m = 0.16 / Math.sqrt(12);
+  const sigma_e = 0.10 / Math.sqrt(12);
+  const r_m = new Array(n).fill(0).map(() => sigma_m * randn_b(rng));
+  const r_p = new Array(n).fill(0).map((_, t) => beta_t[t] * r_m[t] + sigma_e * randn_b(rng));
+
+  const rolling_beta = new Array(n).fill(null);
+  for (let t = bw; t < n; t++) {
+    let sum_xy = 0, sum_xx = 0, mx = 0, my = 0;
+    for (let s = t - bw; s < t; s++) { mx += r_m[s] / bw; my += r_p[s] / bw; }
+    for (let s = t - bw; s < t; s++) { sum_xy += (r_m[s] - mx) * (r_p[s] - my); sum_xx += (r_m[s] - mx) ** 2; }
+    rolling_beta[t] = sum_xy / Math.max(sum_xx, 1e-12);
+  }
+  const valid = rolling_beta.filter(v => v !== null);
+  const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+  const sorted = valid.slice().sort((a, b) => a - b);
+  const p5 = sorted[Math.floor(sorted.length * 0.05)];
+  const p95 = sorted[Math.floor(sorted.length * 0.95)];
+
+  document.getElementById('avg_beta').textContent = avg.toFixed(2);
+  document.getElementById('bt_range').textContent = p5.toFixed(2) + ' to ' + p95.toFixed(2);
+
+  Plotly.react('beta_plot', [
+    { y: beta_t, mode: 'lines', name: 'True beta', line: { color: '#22543d', width: 2 } },
+    { y: rolling_beta, mode: 'lines', name: 'Rolling estimate', line: { color: '#2b6cb0', width: 2 } }
+  ], {
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: { title: 'Month' },
+    yaxis: { title: 'Beta to market' },
+    legend: { orientation: 'h', y: -0.22 }
+  }, { displayModeBar: false });
+}
+['beta_nom', 'bd', 'bw'].forEach(id => document.getElementById(id).addEventListener('input', updateBeta));
+updateBeta();
 </script>
 </body>
 </html>
